@@ -31,8 +31,8 @@ else:
 student_y_n=input("Are you student y/n?:")
 member_y_n= input("Are you member y/n?:")
 if student_y_n == "y" and member_y_n == "y":
-    print ("you have discount")
+    print ("you have addtional discount")
 elif student_y_n == "y" or member_y_n == "y":
-    print("you have additional discount")
+    print("you have discount")
 else:
     print("sorry you dont have dicount")
