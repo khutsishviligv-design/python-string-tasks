@@ -1,11 +1,6 @@
-""1. მომხმარებელს შემოატანინე ასაკი (input() გამოყენებით) და if / elif / else გამოყენებით დაადგინე, რომელი კატეგორიას ეკუთვნის:
-ბავშვი (0–12)
-თინეიჯერი (13–19)
-ზრდასრული (20–64)
-უფროსი (65+)
-ბოლოს დაბეჭდე შედეგი, მაგალითად:
-"თქვენ ხართ: თინეიჯერი"""
 
+
+"davaleba1"
 age=int(input("Please enter your age:"))
 if age  >=0 and age <=12:
     status="Child"
@@ -19,3 +14,13 @@ else:
     status = "not correct age"
 
 print("You are:", status)
+
+
+
+"davaleba2"
+score= int(input("Hello Student, what is your score"))
+attendance= int(input("What was your attendance in percentage? (%)"))
+if score >= 60 and attendance >= 75:
+    print ("You pass")
+else:
+    print("You fail")
