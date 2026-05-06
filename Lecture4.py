@@ -24,3 +24,15 @@ if score >= 60 and attendance >= 75:
     print ("You pass")
 else:
     print("You fail")
+
+
+
+"davaleba3"
+student_y_n=input("Are you student y/n?:")
+member_y_n= input("Are you member y/n?:")
+if student_y_n == "y" and member_y_n == "y":
+    print ("you have discount")
+elif student_y_n == "y" or member_y_n == "y":
+    print("you have additional discount")
+else:
+    print("sorry you dont have dicount")
