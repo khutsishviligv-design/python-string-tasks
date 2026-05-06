@@ -36,3 +36,15 @@ elif student_y_n == "y" or member_y_n == "y":
     print("you have discount")
 else:
     print("sorry you dont have dicount")
+
+
+
+"davaleba4"
+
+username = input("eneter username: ")
+
+if 3 <= len(username) <= 20 and username.isalnum():
+    print("username correct")
+else:
+    print("username wrong")
+
