@@ -1,0 +1,46 @@
+# #davaleba1:
+def add(a,b,c,d):
+    return a+b+c
+    print(add(*nums))
+
+
+#davaleba2:
+is_even=lambda x:x %2==0
+print(is_even(35
+
+#davaleba3:
+
+students = [
+    ("Luka", 15, 85),
+    ("Ana", 14, 92),
+    ("Giorgi", 16, 78),
+    ("Nino", 15, 95)
+]
+
+sorted_students = sorted(students, key=lambda x: (x[1], x[2]))
+
+print(sorted_student)
+
+
+#davaleba4:
+#
+words = ["banana", "apple", "kiwi", "watermelon", "cherry"]
+
+sorted_words = sorted(words, key=lambda x: len(x), reverse=True)
+
+print(sorted_words)
+
+
+#davaleba5:
+
+words = ["banana", "apple", "kiwi", "watermelon", "cherry"]
+
+new_words = list(map(str.capitalize, words))
+
+print(new_words)
+
+
+#davaleba6:
+numbers = [5, 12, 7, 18, 3, 24, 9]
+unashto=list(filter( lambda x:x>10 and x %3==0,numbers))
+print(unashto)
