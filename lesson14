@@ -1,0 +1,80 @@
+#davaleba1
+with open  ("data.txt", "r") as file:
+    reader=file.read()
+    lengthchar=len(reader)
+
+    print( f"სიმბოლოების რაოდენობა: {lengthchar}")
+
+    wordssplit=reader.split(" ")
+    wordslength_len=len(wordssplit)
+    print(f"sityvebis რაოდენობა:{wordslength_len}")
+    striqoni=reader.split("\n")
+
+    lenstriqoni=len(striqoni)
+    print(f"სტრიქონის რაოდენობა: {lenstriqoni}")
+
+#davaleba2
+
+while True:
+    text = input("ტექსტი შეიყვანე: ")
+
+    if text == "exit":
+        break
+
+    with open("journal.txt", "a") as file:
+        file.write(text + "\n")
+
+#davaleba3
+import csv
+
+
+
+with open("products.csv", "r", newline="") as csvfile:
+    reader = csv.reader(csvfile, delimiter=",")
+
+    customer = int(input("Minimum Price: "))
+
+    headers = next(reader)
+
+    with open("filtered_products.csv", "w", newline="") as new_file:
+        writer = csv.writer(new_file, delimiter=",")
+
+        writer.writerow(headers)
+
+        for row in reader:
+            price = float(row[1])
+
+            if price > customer:
+                writer.writerow(row)
+
+print("ფაილი შეიქმნა")
+#davaleba4
+import csv
+
+with open("contacts.csv", "r+", newline="") as csvfile:
+   reader = csv.reader(csvfile, delimiter=",")
+   action=int(input("What do you want to do ?"
+                " 1. ყველა კონტაქტის ნახვა"
+                " 2. კონტაქტის დამატება"
+                " 3. კონტაქტის ძებნა სახელით"
+                " 4. კონტაქტის წაშლა:"))
+if action==1:
+    for row in reader:
+        print(row)
+if action==2:
+    ask=input("text you want to add")
+    write= open("contacts.csv", "a+")
+    write.writerow(ask)
+    write.close()
+if action==3:
+    ask2=input("what you search")
+    for row in reader:
+        if ask2 in row:
+            print (row)
+if action==4:
+    ask3=input("What kind of contact you want to delete")
+    if ask3 in row:
+        write=open("contacts.csv", "a+")
+        (write.delete(ask3))
+    else:
+        print(" the name does not eixit")
