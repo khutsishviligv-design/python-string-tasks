@@ -1,0 +1,481 @@
+from datetime import datetime
+
+import numpy as np
+import csv
+from datetime import datetime
+from pathlib import Path
+
+
+PRODUCTS_FILE = Path("products.csv")
+LOG_FILE = Path("log.txt")
+
+FIELDNAMES = ["id", "name", "price", "stock"]
+
+
+def log_action(username, action, additional_info=""):
+    """
+    მომხმარებლის მოქმედებას ამატებს log.txt ფაილში.
+    """
+
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    log_message = (
+        f"[{current_time}] "
+        f"USER={username} | "
+        f"ACTION={action}"
+    )
+
+    if additional_info:
+        log_message += f" | {additional_info}"
+
+    with LOG_FILE.open("a", encoding="utf-8") as file:
+        file.write(log_message + "\n")
+
+
+def create_products_file_if_not_exists():
+    """
+    თუ products.csv არ არსებობს, ქმნის ცარიელ CSV ფაილს
+    შესაბამისი სათაურებით.
+    """
+
+    if not PRODUCTS_FILE.exists():
+        with PRODUCTS_FILE.open("w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=FIELDNAMES)
+            writer.writeheader()
+
+
+def load_products():
+    """
+    კითხულობს პროდუქტებს products.csv ფაილიდან
+    და აბრუნებს პროდუქტების სიას.
+    """
+
+    create_products_file_if_not_exists()
+
+    products = []
+
+    with PRODUCTS_FILE.open("r", newline="", encoding="utf-8") as file:
+        reader = csv.DictReader(file)
+
+        if reader.fieldnames is None:
+            return products
+
+        missing_columns = [
+            column for column in FIELDNAMES
+            if column not in reader.fieldnames
+        ]
+
+        if missing_columns:
+            raise ValueError(
+                "CSV ფაილში აკლია სვეტები: "
+                + ", ".join(missing_columns)
+            )
+
+        for row in reader:
+            if not row.get("id"):
+                continue
+
+            products.append(
+                {
+                    "id": row["id"].strip(),
+                    "name": row["name"].strip(),
+                    "price": row["price"].strip(),
+                    "stock": row["stock"].strip(),
+                }
+            )
+
+    return products
+
+
+def save_products(products):
+    """
+    პროდუქტების სრულ სიას ინახავს products.csv ფაილში.
+    """
+
+    with PRODUCTS_FILE.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=FIELDNAMES)
+
+        writer.writeheader()
+        writer.writerows(products)
+
+
+def display_product(product):
+    """
+    ბეჭდავს ერთი პროდუქტის ინფორმაციას.
+    """
+
+    print("-" * 40)
+    print(f"ID:       {product['id']}")
+    print(f"Name:     {product['name']}")
+    print(f"Price:    {product['price']}")
+    print(f"Stock:    {product['stock']}")
+    print("-" * 40)
+
+
+def show_all_products(username):
+    """
+    აჩვენებს ყველა პროდუქტს.
+    """
+
+    try:
+        products = load_products()
+
+        if not products:
+            print("\nპროდუქტების სია ცარიელია.")
+            log_action(
+                username,
+                "VIEW_ALL_PRODUCTS",
+                "RESULT=NO_PRODUCTS"
+            )
+            return
+
+        print("\nყველა პროდუქტი:")
+
+        for product in products:
+            display_product(product)
+
+        log_action(
+            username,
+            "VIEW_ALL_PRODUCTS",
+            f"PRODUCT_COUNT={len(products)}"
+        )
+
+    except (OSError, ValueError) as error:
+        print(f"\nპროდუქტების წაკითხვა ვერ მოხერხდა: {error}")
+
+        log_action(
+            username,
+            "VIEW_ALL_PRODUCTS_FAILED",
+            f"ERROR={error}"
+        )
+
+
+def get_product_by_id(username):
+    """
+    ეძებს პროდუქტს ID-ის მიხედვით.
+    """
+
+    product_id = input("Enter product ID: ").strip()
+
+    if not product_id:
+        print("პროდუქტის ID არ შეიძლება იყოს ცარიელი.")
+
+        log_action(
+            username,
+            "GET_PRODUCT_FAILED",
+            "REASON=EMPTY_PRODUCT_ID"
+        )
+        return
+
+    try:
+        products = load_products()
+
+        for product in products:
+            if product["id"] == product_id:
+                print("\nპროდუქტი მოიძებნა:")
+                display_product(product)
+
+                log_action(
+                    username,
+                    "GET_PRODUCT",
+                    f"PRODUCT_ID={product_id} | RESULT=FOUND"
+                )
+                return
+
+        print(f"\nპროდუქტი ID-ით {product_id} არ მოიძებნა.")
+
+        log_action(
+            username,
+            "GET_PRODUCT",
+            f"PRODUCT_ID={product_id} | RESULT=NOT_FOUND"
+        )
+
+    except (OSError, ValueError) as error:
+        print(f"\nპროდუქტის მოძებნა ვერ მოხერხდა: {error}")
+
+        log_action(
+            username,
+            "GET_PRODUCT_FAILED",
+            f"PRODUCT_ID={product_id} | ERROR={error}"
+        )
+
+
+def get_next_product_id(products):
+    """
+    პოულობს ყველაზე დიდ არსებულ რიცხვით ID-ს
+    და აბრუნებს შემდეგ ID-ს.
+    """
+
+    numeric_ids = []
+
+    for product in products:
+        try:
+            numeric_ids.append(int(product["id"]))
+        except (ValueError, TypeError):
+            continue
+
+    if not numeric_ids:
+        return 1
+
+    return max(numeric_ids) + 1
+
+
+def read_product_name():
+    """
+    მომხმარებლისგან იღებს პროდუქტის სახელს.
+    """
+
+    while True:
+        name = input("Enter product name: ").strip()
+
+        if name:
+            return name
+
+        print("პროდუქტის სახელი არ შეიძლება იყოს ცარიელი.")
+
+
+def read_product_price():
+    """
+    მომხმარებლისგან იღებს დადებით ან ნულოვან ფასს.
+    """
+
+    while True:
+        price_input = input("Enter product price: ").strip()
+
+        try:
+            price = float(price_input)
+
+            if price < 0:
+                print("ფასი არ შეიძლება იყოს უარყოფითი.")
+                continue
+
+            return price
+
+        except ValueError:
+            print("შეიყვანეთ სწორი რიცხვითი ფასი, მაგალითად: 4.5")
+
+
+def read_product_stock():
+    """
+    მომხმარებლისგან იღებს დადებით ან ნულოვან მთელ რაოდენობას.
+    """
+
+    while True:
+        stock_input = input("Enter product stock: ").strip()
+
+        try:
+            stock = int(stock_input)
+
+            if stock < 0:
+                print("რაოდენობა არ შეიძლება იყოს უარყოფითი.")
+                continue
+
+            return stock
+
+        except ValueError:
+            print("რაოდენობა უნდა იყოს მთელი რიცხვი, მაგალითად: 50")
+
+
+def add_product(username):
+    """
+    ამატებს ახალ პროდუქტს products.csv ფაილში.
+    """
+
+    try:
+        products = load_products()
+
+        name = read_product_name()
+        price = read_product_price()
+        stock = read_product_stock()
+
+        new_product_id = get_next_product_id(products)
+
+        new_product = {
+            "id": str(new_product_id),
+            "name": name,
+            "price": str(price),
+            "stock": str(stock),
+        }
+
+        products.append(new_product)
+        save_products(products)
+
+        print("\nპროდუქტი წარმატებით დაემატა:")
+        display_product(new_product)
+
+        log_action(
+            username,
+            "ADD_PRODUCT",
+            (
+                f"PRODUCT_ID={new_product_id} | "
+                f"NAME={name} | "
+                f"PRICE={price} | "
+                f"STOCK={stock}"
+            )
+        )
+
+    except (OSError, ValueError) as error:
+        print(f"\nპროდუქტის დამატება ვერ მოხერხდა: {error}")
+
+        log_action(
+            username,
+            "ADD_PRODUCT_FAILED",
+            f"ERROR={error}"
+        )
+
+
+def delete_product(username):
+    """
+    შლის პროდუქტს ID-ის მიხედვით.
+    """
+
+    product_id = input("Enter product ID to delete: ").strip()
+
+    if not product_id:
+        print("პროდუქტის ID არ შეიძლება იყოს ცარიელი.")
+
+        log_action(
+            username,
+            "DELETE_PRODUCT_FAILED",
+            "REASON=EMPTY_PRODUCT_ID"
+        )
+        return
+
+    try:
+        products = load_products()
+
+        product_to_delete = None
+
+        for product in products:
+            if product["id"] == product_id:
+                product_to_delete = product
+                break
+
+        if product_to_delete is None:
+            print(f"\nპროდუქტი ID-ით {product_id} არ მოიძებნა.")
+
+            log_action(
+                username,
+                "DELETE_PRODUCT",
+                f"PRODUCT_ID={product_id} | RESULT=NOT_FOUND"
+            )
+            return
+
+        updated_products = [
+            product
+            for product in products
+            if product["id"] != product_id
+        ]
+
+        save_products(updated_products)
+
+        print(
+            f"\nპროდუქტი '{product_to_delete['name']}' "
+            "წარმატებით წაიშალა."
+        )
+
+        log_action(
+            username,
+            "DELETE_PRODUCT",
+            (
+                f"PRODUCT_ID={product_id} | "
+                f"NAME={product_to_delete['name']} | "
+                "RESULT=DELETED"
+            )
+        )
+
+    except (OSError, ValueError) as error:
+        print(f"\nპროდუქტის წაშლა ვერ მოხერხდა: {error}")
+
+        log_action(
+            username,
+            "DELETE_PRODUCT_FAILED",
+            f"PRODUCT_ID={product_id} | ERROR={error}"
+        )
+
+
+def show_menu():
+    """
+    ბეჭდავს პროგრამის მთავარ მენიუს.
+    """
+
+    print("\n" + "=" * 40)
+    print("PRODUCT MANAGEMENT SYSTEM")
+    print("=" * 40)
+    print("1. Show all products")
+    print("2. Get product by ID")
+    print("3. Add product")
+    print("4. Delete product")
+    print("5. Exit")
+    print("=" * 40)
+
+
+def get_username():
+    """
+    მომხმარებლისგან იღებს სახელს.
+    ცარიელ სახელს არ იღებს.
+    """
+
+    while True:
+        username = input("Enter your name: ").strip()
+
+        if username:
+            return username
+
+        print("მომხმარებლის სახელი არ შეიძლება იყოს ცარიელი.")
+
+
+def main():
+    """
+    პროგრამის მთავარი ფუნქცია.
+    """
+
+    create_products_file_if_not_exists()
+
+    username = get_username()
+
+    print(f"\nWelcome, {username}!")
+
+    log_action(
+        username,
+        "LOGIN"
+    )
+
+    while True:
+        show_menu()
+
+        choice = input("Choose an option: ").strip()
+
+        if choice == "1":
+            show_all_products(username)
+
+        elif choice == "2":
+            get_product_by_id(username)
+
+        elif choice == "3":
+            add_product(username)
+
+        elif choice == "4":
+            delete_product(username)
+
+        elif choice == "5":
+            print(f"\nGoodbye, {username}!")
+
+            log_action(
+                username,
+                "EXIT"
+            )
+            break
+
+        else:
+            print("\nარასწორი არჩევანი. აირჩიეთ რიცხვი 1-დან 5-მდე.")
+
+            log_action(
+                username,
+                "INVALID_MENU_CHOICE",
+                f"CHOICE={choice}"
+            )
+
+
+if __name__ == "__main__":
+    main()
