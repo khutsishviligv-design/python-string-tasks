@@ -1,1 +1,122 @@
 
+
+#davaleba1:
+class Person:
+    def __init__(self, first_name, last_name):
+        self.first_name = first_name
+        self.last_name = last_name
+
+    def introduce(self):
+        return f"My name is {self.first_name} {self.last_name}"
+
+
+class Student(Person):
+    def introduce(self):
+        return f"I am student {self.first_name} {self.last_name}"
+
+
+class Lecturer(Person):
+    def introduce(self):
+        return f"I am lecturer {self.first_name} {self.last_name}"
+
+
+
+
+student = Student("Nino", "Sardin")
+print(student.introduce())
+
+lecturer = Lecturer("Jane", "Doe")
+print(lecturer.introduce())
+
+#davaleba2
+class Profile:
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
+
+def check_password(self,password):
+    return self.__password == password
+
+def change_password(self,old_password, new_password):
+    class Profile:
+        def __init__(self, username, password):
+            self.username = username
+            self.__password = password
+
+        def check_password(self, password):
+            return self.__password == password
+
+        def change_password(self, old_password, new_password):
+
+            if self.__password == old_password:
+                self.__password = new_password
+                print("Password changed successfully")
+            else:
+                print("Wrong password")
+
+    profile = Profile("gvantsa", "1234")
+
+    print(profile.check_password("1234"))
+
+    profile.change_password("1234", "5678")
+
+    print(profile.check_password("5678"))
+
+#davaleba3
+class product:
+    def __init__(self, name, price):
+        self.name = name
+        self.__price = 0
+        self.set_price(price)
+
+    def set_price(self,price):
+        if price  < 0 :
+            raise ValueError ("Price cant be negative")
+    def get_price(self):
+        return self.__price
+#Davaleba4
+
+class CreditCardPayment:
+    def pay(self, amount):
+        print(f"Paid {amount}$ using Credit Card")
+
+
+class PayPalPayment:
+    def pay(self, amount):
+        print(f"Paid {amount}$ using PayPal")
+
+
+class CryptoPayment:
+    def pay(self, amount):
+        print(f"Paid {amount}$ using Crypto")
+
+
+card = CreditCardPayment()
+paypal = PayPalPayment()
+crypto = CryptoPayment()
+
+card.pay(100)
+paypal.pay(200)
+crypto.pay(300)
+
+#davaleba5
+class Car:
+
+    total_cars = 0
+
+    def __init__(self, brand):
+        self.brand = brand
+        Car.total_cars += 1
+
+    @classmethod
+    def get_total_cars(cls):
+        return cls.total_cars
+
+
+c1 = Car("BMW")
+c2 = Car("Mercedes")
+c3 = Car("Toyota")
+
+print(Car.get_total_cars())
+
+
