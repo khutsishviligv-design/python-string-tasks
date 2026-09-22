@@ -1,0 +1,142 @@
+import os
+
+from dotenv import load_dotenv
+from google import genai
+from google.genai import errors
+
+
+# .env ფაილის ჩატვირთვა
+load_dotenv()
+
+MODEL_NAME = "gemini-3.6-flash"
+
+
+def test_missing_api_key():
+    print("\n1. Missing API Key")
+
+    try:
+       
+        api_key = None
+
+        if api_key is None:
+            raise ValueError("GEMINI_API_KEY არ არის მითითებული.")
+
+        client = genai.Client(api_key=api_key)
+
+        client.models.generate_content(
+            model=MODEL_NAME,
+            contents="Hello"
+        )
+
+    except ValueError as error:
+        print("შეცდომა: API key ვერ მოიძებნა.")
+        print("შექმენი .env ფაილი და ჩაწერე:")
+        print("GEMINI_API_KEY=შენი_ნამდვილი_API_KEY")
+        print(f"დეტალები: {error}")
+
+
+def test_invalid_api_key():
+    print("\n2. Invalid API Key")
+
+    try:
+       
+        client = genai.Client(
+            api_key="this-is-not-a-real-api-key"
+        )
+
+        client.models.generate_content(
+            model=MODEL_NAME,
+            contents="Hello"
+        )
+
+    except errors.ClientError as error:
+        print("ავტორიზაცია ვერ შესრულდა.")
+        print(f"Status code: {error.code}")
+        print(
+            "API key არასწორია. პრობლემა credentials-შია "
+            "და არა Python-ის კოდის სინტაქსში."
+        )
+        print("შეამოწმე GEMINI_API_KEY .env ფაილში.")
+        print(f"დეტალები: {error}")
+
+    except Exception as error:
+        print(f"შეცდომის ტიპი: {type(error).__name__}")
+        print(f"დეტალები: {error}")
+
+
+def test_invalid_model():
+    print("\n3. არასწორი მოდელის სახელი")
+
+    try:
+        api_key = os.getenv("GEMINI_API_KEY")
+
+        if not api_key:
+            raise ValueError(
+                "ამ ტესტისთვის საჭიროა მოქმედი GEMINI_API_KEY."
+            )
+
+        client = genai.Client(api_key=api_key)
+
+        # განზრახ არარსებული მოდელი
+        client.models.generate_content(
+            model="gemini-nonexistent-odel-123",
+            contents="Hello"
+        )
+
+    except ValueError as error:
+        print("API key ვერ მოიძებნა.")
+        print("დაამატე GEMINI_API_KEY .env ფაილში.")
+        print(f"დეტალები: {error}")
+
+    except errors.ClientError as error:
+        print("მოდელი ვერ მოიძებნა.")
+        print(f"Status code: {error.code}")
+        print(
+            "მოდელის სახელი არასწორია, არ არსებობს "
+            "ან აღარ არის ხელმისაწვდომი."
+        )
+        print(f"გამოიყენე მოქმედი მოდელი: {MODEL_NAME}")
+        print(f"დეტალები: {error}")
+
+    except Exception as error:
+        print(f"შეცდომის ტიპი: {type(error).__name__}")
+        print(f"დეტალები: {error}")
+
+
+def test_general_error():
+    print("\n4. ზოგადი API შეცდომა")
+
+    try:
+        api_key = os.getenv("GEMINI_API_KEY")
+
+        if not api_key:
+            raise ValueError(
+                "ამ ტესტისთვის საჭიროა მოქმედი GEMINI_API_KEY."
+            )
+
+        client = genai.Client(api_key=api_key)
+
+       
+        client.models.generate_content(
+            model=MODEL_NAME,
+            contents="Hello",
+            config={
+                "invalid_param": True
+            }
+        )
+
+    except Exception as error:
+        print("მოულოდნელი შეცდომა დაფიქსირდა.")
+        print(f"შეცდომის ტიპი: {type(error).__name__}")
+        print(f"მოკლე აღწერა: {error}")
+
+
+def main():
+    test_missing_api_key()
+    test_invalid_api_key()
+    test_invalid_model()
+    test_general_error()
+
+
+if __name__ == "__main__":
+    main()
