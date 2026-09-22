@@ -1,0 +1,43 @@
+import os
+
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+
+load_dotenv()
+
+client = genai.Client(
+    api_key=os.getenv("GEMINI_API_KEY")
+)
+
+MODEL_NAME = "gemini-3.6-flash"
+
+question = "შემიძლია თუ არა თანხის დაბრუნება, თუ აზრი შევიცვალე?"
+
+instructions = {
+    "ფორმალური":
+        "შენ ხარ პროფესიონალი, ზუსტი და ოფიციალური ასისტენტი.",
+
+    "მეგობრული":
+        "შენ ხარ მეგობრული, თბილი და მარტივი ენით მომუშავე ასისტენტი.",
+
+    "იუმორისტული":
+        "შენ ხარ იუმორისტული და მსუბუქი ტონის მქონე ასისტენტი."
+}
+for style, instruction in instructions.items():
+
+    print(f"\nსტილი: {style}")
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=question,
+            config=types.GenerateContentConfig(
+                system_instruction=instruction
+            )
+        )
+
+        print(response.text)
+
+    except Exception as e:
+        print(f"შეცდომა: {e}")
