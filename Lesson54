@@ -1,0 +1,165 @@
+#amocana1
+from pydantic import BaseModel
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+
+class Book(BaseModel):
+    title: str
+    author: str
+    year: int
+    genres: list[str]
+    pages: int
+
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    temperature=0
+)
+
+structured_llm = llm.with_structured_output(Book)
+
+result = structured_llm.invoke(
+    """
+    George Orwell's famous novel 1984 was published in 1949.
+    It is a dystopian political fiction book with 328 pages.
+    """
+)
+
+print("Title:", result.title)
+
+print("Author:", result.author)
+print("Year:", result.year)
+print("Genres:", result.genres)
+print("Pages:", result.pages)
+
+
+#amocana2
+from langchain_core.prompts import PromptTemplate
+from langchain_google_genai import ChatGoogleGenerativeAI
+from pydantic import BaseModel
+from dotenv import load_dotenv
+load_dotenv()
+
+class Product(BaseModel):
+    name: str
+    price: float
+    currency: str
+    in_stock: bool
+    colors: list[str]
+
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    temperature=0
+)
+
+prompt = PromptTemplate(
+    input_variables=["text"],
+    template="""
+    Extract product information from the following text:
+
+    {text}
+    """
+)
+
+structured_llm = llm.with_structured_output(Product)
+
+chain = prompt | structured_llm
+
+result = chain.invoke(
+    {
+        "text": "The new wireless headphones cost 149.99 USD. Available in black, white and blue. Currently in stock."
+    }
+)
+
+print("Name:", result.name)
+print("Price:", result.price)
+print("Currency:", result.currency)
+print("In Stock:", result.in_stock)
+print("Colors:", result.colors)
+
+#amocana3
+import os
+
+from dotenv import load_dotenv
+from pydantic import BaseModel, Field
+
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+
+
+load_dotenv()
+
+
+class FantasyQuest(BaseModel):
+    quest_name: str
+    hero_name: str
+    enemy: str
+    magical_item: str
+
+    danger_level: int = Field(
+        ge=1,
+        le=10
+    )
+
+    reward: str
+    side_quests: list[str]
+    is_cursed: bool
+
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-3.6-flash"
+
+)
+
+
+prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """
+            შენ ხარ ეპიკური ფენტეზის თავგადასავლების შემქმნელი.
+
+            მოთხოვნები:
+            1. პასუხი უნდა იყოს მაქსიმალურად ეპიკური ფენტეზის სტილში.
+            2. თუ მოცემულ ტექსტში რომელიმე ინფორმაცია აკლია,
+               თავად მოიფიქრე ლოგიკური და საინტერესო დეტალი.
+            3. danger_level უნდა იყოს 1-დან 10-მდე და რეალისტურად
+               უნდა შეფასდეს ტექსტში აღწერილი საფრთხის მიხედვით.
+            4. პასუხი აუცილებლად დააბრუნე მოცემული სტრუქტურის შესაბამისად.
+            """
+        ),
+        (
+            "human",
+            """
+            მოცემული ტექსტიდან შექმენი ფენტეზის დავალება:
+
+            {text}
+            """
+        )
+    ]
+)
+
+
+structured_llm = llm.with_structured_output(
+    FantasyQuest
+)
+
+
+chain = prompt | structured_llm
+
+
+result = chain.invoke(
+    {
+        "text": """
+        ახალგაზრდა ჯადოქარი სახელად ლირა უნდა გაემგზავროს
+        ჩრდილოეთის ტყეებში, რათა იპოვოს დაკარგული მთვარის ხმალი.
+        გზად მას ელოდება უძველესი ტყის სული, რომელსაც სძულს ადამიანები.
+        თუ წარმატებას მიაღწევს, მიიღებს უკვდავების ელექსირს.
+        """
+    }
+)
+
+
+print(result)
