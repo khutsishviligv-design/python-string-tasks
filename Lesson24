@@ -1,0 +1,201 @@
+import requests
+from requests.exceptions import HTTPError, ConnectTimeout
+from pydantic import BaseModel, ValidationError
+import json
+
+
+
+
+class Recipe (BaseModel):
+    name: str
+    cuisine:str
+    time_minutes:str
+
+BASE_URL="https://crudcrud.com/api/8803a9e81d26433bacaa1605c81ea010"
+API_URL = BASE_URL + "/Recipe"
+
+
+def addrecipe():
+
+
+   try:
+       with open("recipes.json", "r") as file:
+           data = json.load(file)
+
+       for item in data:
+           recipe = Recipe(**item)
+
+           response = requests.post(
+               API_URL,
+               json=recipe.model_dump(),
+               timeout=10
+           )
+
+           response.raise_for_status()
+
+           print(response.json())
+
+   except HTTPError as e:
+       print("HTTP Error:", e)
+
+   except ConnectTimeout as e:
+       print("Connection Timeout:", e)
+
+   except ValidationError as e:
+       print("Validation Error:", e)
+addrecipe()
+
+
+def getrecipe():
+
+
+   try:
+
+           response = requests.get(
+               API_URL,
+
+               timeout=10
+           )
+
+           response.raise_for_status()
+           recipes=response.json()
+
+
+           for recipe in recipes:
+               print(recipe["name"], recipe["time_minutes"])
+   except HTTPError as e:
+       print("HTTP Error:", e)
+
+   except ConnectTimeout as e:
+       print("Connection Timeout:", e)
+
+
+
+getrecipe()
+
+def onegetrecipe():
+    try:
+        response = requests.get(
+            API_URL,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        recipes = response.json()
+
+        first_recipe = recipes[0]
+
+        recipe_id = first_recipe["_id"]
+
+        response = requests.get(
+            API_URL + "/" + recipe_id,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        print(response.json())
+
+    except HTTPError as e:
+        print("HTTP Error:", e)
+
+    except ConnectTimeout as e:
+        print("Connection Timeout:", e)
+
+onegetrecipe()
+
+def update_recipe():
+
+    try:
+
+        response = requests.get(
+            API_URL,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        recipes = response.json()
+
+        # პირველი რეცეპტის ID
+        recipe_id = recipes[0]["_id"]
+
+        # ახალი მონაცემები
+        updated_recipe = Recipe(
+            name="Adjarian Khachapuri",
+            cuisine="Georgian",
+            time_minutes="40"
+        )
+
+        # PUT მოთხოვნა
+        response = requests.put(
+            API_URL + "/" + recipe_id,
+            json=updated_recipe.model_dump(),
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        print("Recipe updated successfully")
+
+
+    except HTTPError as e:
+        print("HTTP Error:", e)
+
+    except ConnectTimeout as e:
+        print("Connection Timeout:", e)
+
+    except ValidationError as e:
+        print("Validation Error:", e)
+
+
+update_recipe()
+
+def delete_recipe():
+
+    try:
+        
+        response = requests.get(
+            API_URL,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        recipes = response.json()
+
+        # ბოლო რეცეპტის ID
+        recipe_id = recipes[-1]["_id"]
+
+        # ბოლო რეცეპტს ვშლით
+        response = requests.delete(
+            API_URL + "/" + recipe_id,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        print("Recipe deleted successfully")
+
+        #
+        response = requests.get(
+            API_URL,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        recipes = response.json()
+
+        for recipe in recipes:
+            print(recipe["name"], recipe["time_minutes"])
+
+    except HTTPError as e:
+        print("HTTP Error:", e)
+
+    except ConnectTimeout as e:
+        print("Connection Timeout:", e)
+
+
+delete_recipe()
