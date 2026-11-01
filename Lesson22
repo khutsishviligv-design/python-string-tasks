@@ -1,1 +1,245 @@
+import json
+import os
+from dataclasses import dataclass, asdict
 
+
+# -------------------------
+# 1. Book მოდელი
+# -------------------------
+
+@dataclass
+class Book:
+    id: int
+    title: str
+    author: str
+    year: int
+    available: bool
+
+
+# -------------------------
+# 2. JSON ფუნქციები
+# -------------------------
+
+def save_books(books):
+    with open("books.json", "w", encoding="utf-8") as f:
+        json.dump(
+            [asdict(book) for book in books],
+            f,
+            ensure_ascii=False,
+            indent=2
+        )
+
+    print(" მონაცემები შენახულია!")
+
+
+def load_books():
+    if os.path.exists("books.json"):
+        with open("books.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        return [Book(**item) for item in data]
+
+    return []
+
+
+# -------------------------
+# 3. წიგნის დამატება
+# -------------------------
+
+def add_book(books):
+    title = input("შეიყვანე წიგნის სახელი: ")
+    author = input("შეიყვანე ავტორი: ")
+
+    try:
+        year = int(input("შეიყვანე წელი: "))
+    except ValueError:
+        print(" წელი უნდა იყოს რიცხვი!")
+        return
+
+    new_id = max((book.id for book in books), default=0) + 1
+
+    new_book = Book(
+        id=new_id,
+        title=title,
+        author=author,
+        year=year,
+        available=True
+    )
+
+    books.append(new_book)
+
+    print(" წიგნი დაემატა!")
+
+
+# -------------------------
+# 4. ყველა წიგნის ნახვა
+# -------------------------
+
+def show_books(books):
+    if not books:
+        print("ბიბლიოთეკაში წიგნები არ არის.")
+        return
+
+    for book in books:
+        if book.available:
+            status = "ხელმისაწვდომი"
+        else:
+            status = "გაცემული"
+
+        print(
+            f"ID: {book.id} | "
+            f"{book.title} | "
+            f"{book.author} | "
+            f"{book.year} | "
+            f"{status}"
+        )
+
+
+# -------------------------
+# 5. წიგნის ძებნა
+# -------------------------
+
+def search_book(books):
+    search = input("შეიყვანე წიგნის სახელი: ")
+
+    found = False
+
+    for book in books:
+        if search.lower() in book.title.lower():
+            status = "ხელმისაწვდომი" if book.available else "გაცემული"
+
+            print(
+                f"ID: {book.id} | "
+                f"{book.title} | "
+                f"{book.author} | "
+                f"{book.year} | "
+                f"{status}"
+            )
+
+            found = True
+
+    if not found:
+        print("წიგნი ვერ მოიძებნა.")
+
+
+# -------------------------
+# 6. წიგნის გატანა
+# -------------------------
+
+def borrow_book(books):
+    try:
+        book_id = int(input("შეიყვანე წიგნის ID: "))
+    except ValueError:
+        print("ID უნდა იყოს რიცხვი!")
+        return
+
+    for book in books:
+        if book.id == book_id:
+
+            if book.available:
+                book.available = False
+                print(" წიგნი წარმატებით გაიცა!")
+            else:
+                print(" ეს წიგნი უკვე გაცემულია.")
+
+            return
+
+    print("ასეთი ID-ის წიგნი ვერ მოიძებნა.")
+
+
+# -------------------------
+# 7. წიგნის დაბრუნება
+# -------------------------
+
+def return_book(books):
+    try:
+        book_id = int(input("შეიყვანე წიგნის ID: "))
+    except ValueError:
+        print("ID უნდა იყოს რიცხვი!")
+        return
+
+    for book in books:
+        if book.id == book_id:
+
+            if book.available:
+                print(" ეს წიგნი უკვე ბიბლიოთეკაშია.")
+            else:
+                book.available = True
+                print(" წიგნი წარმატებით დაბრუნდა!")
+
+            return
+
+    print(" ასეთი ID-ის წიგნი ვერ მოიძებნა.")
+
+
+# -------------------------
+# 8. სტატისტიკა
+# -------------------------
+
+def show_statistics(books):
+    total = len(books)
+
+    available = sum(
+        1 for book in books
+        if book.available
+    )
+
+    borrowed = total - available
+
+    print(f"სულ წიგნები: {total}")
+    print(f"ხელმისაწვდომი: {available}")
+    print(f"გაცემული: {borrowed}")
+
+
+# -------------------------
+# 9. მთავარი პროგრამა
+# -------------------------
+
+def main():
+    books = load_books()
+
+    while True:
+        print("\n--- 📚 ბიბლიოთეკის მართვის სისტემა ---")
+        print("1. წიგნის დამატება")
+        print("2. ყველა წიგნის ნახვა")
+        print("3. წიგნის ძებნა სახელით")
+        print("4. წიგნის გატანა")
+        print("5. წიგნის დაბრუნება")
+        print("6. სტატისტიკა")
+        print("7. მონაცემების შენახვა")
+        print("8. გამოსვლა")
+
+        choice = input("\nაირჩიე მოქმედება: ")
+
+        if choice == "1":
+            add_book(books)
+
+        elif choice == "2":
+            show_books(books)
+
+        elif choice == "3":
+            search_book(books)
+
+        elif choice == "4":
+            borrow_book(books)
+
+        elif choice == "5":
+            return_book(books)
+
+        elif choice == "6":
+            show_statistics(books)
+
+        elif choice == "7":
+            save_books(books)
+
+        elif choice == "8":
+            save_books(books)
+            print(" პროგრამა დასრულდა.")
+            break
+
+        else:
+            print(" არასწორი არჩევანი!")
+
+
+if __name__ == "__main__":
+    main()
