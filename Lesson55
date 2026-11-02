@@ -1,0 +1,302 @@
+import os
+
+import numpy as np
+import psycopg
+
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+from pgvector.psycopg import register_vector
+
+
+# =========================================================
+# კონფიგურაცია
+# =========================================================
+
+load_dotenv()
+
+api_key = os.getenv("GEMINI_API_KEY")
+
+if not api_key:
+    raise ValueError(
+        "GEMINI_API_KEY ვერ მოიძებნა. "
+        "შეამოწმე .env ფაილი."
+    )
+
+
+client = genai.Client(api_key=api_key)
+
+MODEL_NAME = "gemini-embedding-001"
+EMBEDDING_DIMENSION = 768
+
+
+# PostgreSQL-ის პარამეტრები
+DB_CONFIG = {
+    "dbname": os.getenv("DB_NAME"),
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD"),
+    "host": os.getenv("DB_HOST", "localhost"),
+    "port": os.getenv("DB_PORT", "5432")
+}
+
+
+# =========================================================
+# დამხმარე ფუნქციები
+# =========================================================
+
+def get_embedding(text, task_type):
+
+
+    result = client.models.embed_content(
+        model=MODEL_NAME,
+        contents=text,
+        config=types.EmbedContentConfig(
+            task_type=task_type,
+            output_dimensionality=EMBEDDING_DIMENSION
+        )
+    )
+
+    return result.embeddings[0].values
+
+
+def cosine_similarity(vector_1, vector_2):
+
+
+    vector_1 = np.array(vector_1)
+    vector_2 = np.array(vector_2)
+
+    dot_product = np.dot(vector_1, vector_2)
+
+    vector_1_length = np.linalg.norm(vector_1)
+    vector_2_length = np.linalg.norm(vector_2)
+
+    if vector_1_length == 0 or vector_2_length == 0:
+        return 0.0
+
+    similarity = dot_product / (
+        vector_1_length * vector_2_length
+    )
+
+    return float(similarity)
+
+
+def get_database_connection():
+
+
+    connection = psycopg.connect(**DB_CONFIG)
+
+    register_vector(connection)
+
+    return connection
+
+
+def create_document_table():
+
+
+    with psycopg.connect(**DB_CONFIG) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "CREATE EXTENSION IF NOT EXISTS vector;"
+            )
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS document (
+                    id SERIAL PRIMARY KEY,
+                    content TEXT NOT NULL,
+                    vector vector(768)
+                );
+                """
+            )
+
+        connection.commit()
+
+    print("document ცხრილი მზადაა.")
+
+
+# =========================================================
+# დავალება 1 — Cosine Similarity
+# =========================================================
+
+def run_task_1():
+    text_pairs = [
+        (
+            "A small dog running in the park",
+            "A puppy playing outside"
+        ),
+        (
+            "A small dog running in the park",
+            "A new laptop with a fast processor"
+        ),
+        (
+            "I love programming in Python",
+            "Python is a great programming language"
+        ),
+        (
+            "I love programming in Python",
+            "The capital of France is Paris"
+        )
+    ]
+
+    print("\nდავალება 1 — Cosine Similarity")
+
+    for index, pair in enumerate(text_pairs, start=1):
+        text_1, text_2 = pair
+
+        embedding_1 = get_embedding(
+            text=text_1,
+            task_type="SEMANTIC_SIMILARITY"
+        )
+
+        embedding_2 = get_embedding(
+            text=text_2,
+            task_type="SEMANTIC_SIMILARITY"
+        )
+
+        similarity = cosine_similarity(
+            embedding_1,
+            embedding_2
+        )
+
+        print(f"{index}. {similarity:.4f}")
+
+
+# =========================================================
+# დავალება 2 — PostgreSQL-ში ჩაწერა
+# =========================================================
+
+def insert_documents():
+    documents = [
+        "A small dog running in the park",
+        "A puppy playing outside",
+        "A new laptop with a fast processor",
+        "I love programming in Python",
+        "Machine learning is a subset of artificial intelligence",
+        "The weather is very cold today",
+        "Cats are independent animals",
+        "Deep learning uses neural networks"
+    ]
+
+    create_document_table()
+
+    connection = get_database_connection()
+
+    try:
+        with connection.cursor() as cursor:
+
+            # ძველი ჩანაწერების წაშლა, რათა პროგრამის
+            # მეორედ გაშვებისას დუბლიკატები არ შეიქმნას.
+            cursor.execute(
+                "TRUNCATE TABLE document RESTART IDENTITY;"
+            )
+
+            for content in documents:
+                embedding = get_embedding(
+                    text=content,
+                    task_type="RETRIEVAL_DOCUMENT"
+                )
+
+                embedding_array = np.array(
+                    embedding,
+                    dtype=np.float32
+                )
+
+                cursor.execute(
+                    """
+                    INSERT INTO document (content, vector)
+                    VALUES (%s, %s);
+                    """,
+                    (content, embedding_array)
+                )
+
+                print(f"ჩაიწერა: {content}")
+
+        connection.commit()
+
+        print(
+            f"\nბაზაში წარმატებით ჩაიწერა "
+            f"{len(documents)} დოკუმენტი."
+        )
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
+# =========================================================
+# დავალება 3 — Similarity Search
+# =========================================================
+
+def similarity_search():
+    query = input("\nEnter search text: ").strip()
+
+    if not query:
+        print("საძიებო ტექსტი ცარიელი არ უნდა იყოს.")
+        return
+
+    query_embedding = get_embedding(
+        text=query,
+        task_type="RETRIEVAL_QUERY"
+    )
+
+    query_vector = np.array(
+        query_embedding,
+        dtype=np.float32
+    )
+
+    connection = get_database_connection()
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    content,
+                    vector <=> %s AS distance
+                FROM document
+                ORDER BY vector <=> %s
+                LIMIT 3;
+                """,
+                (query_vector, query_vector)
+            )
+
+            results = cursor.fetchall()
+
+    finally:
+        connection.close()
+
+    print("\nTop 3 similar documents:")
+
+    for index, row in enumerate(results, start=1):
+        document_id = row[0]
+        content = row[1]
+        distance = row[2]
+
+        print(
+            f"{index}. [id={document_id}] "
+            f"distance={distance:.4f} | "
+            f"content: {content}"
+        )
+
+
+# =========================================================
+# მთავარი ფუნქცია
+# =========================================================
+
+def main():
+    # დავალება 1
+    run_task_1()
+
+    # დავალება 2
+    insert_documents()
+
+    # დავალება 3
+    similarity_search()
+
+
+if __name__ == "__main__":
+    main()
