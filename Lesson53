@@ -1,0 +1,384 @@
+import os
+
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+from pydantic import BaseModel, ValidationError
+
+
+# --------------------------------------------------
+# Gemini API-ს მომზადება
+# --------------------------------------------------
+
+load_dotenv()
+
+api_key = os.getenv("GEMINI_API_KEY")
+
+if not api_key:
+    raise ValueError(
+        "GEMINI_API_KEY ვერ მოიძებნა. "
+        "შექმენი .env ფაილი და დაამატე API Key."
+    )
+
+client = genai.Client(api_key=api_key)
+
+MODEL_NAME = "gemini-3.6-flash"
+
+
+# ==================================================
+# ამოცანა 1: Token Counting & Context Window
+# ==================================================
+
+def count_text_tokens(text):
+
+
+    response = client.models.count_tokens(
+        model=MODEL_NAME,
+        contents=text
+    )
+
+    token_count = response.total_tokens
+
+    print(f"ტოკენების რაოდენობა: {token_count}")
+
+    if token_count == 0:
+        print("ტექსტი ცარიელია ან ტოკენები ვერ მოიძებნა.")
+
+    elif token_count > 300:
+        print("გაფრთხილება: ტექსტი 300 ტოკენზე მეტია.")
+
+    else:
+        print("ტექსტის ზომა დასაშვებ ლიმიტშია.")
+
+    return token_count
+
+
+def run_task_1():
+    print("\n" + "=" * 60)
+    print("ამოცანა 1 — Token Counting & Context Window")
+    print("=" * 60)
+
+    short_text = "გამარჯობა, როგორ ხარ?"
+
+    medium_text = """
+    ხელოვნური ინტელექტი არის ტექნოლოგია, რომელიც კომპიუტერულ
+    სისტემებს აძლევს შესაძლებლობას შეასრულონ ისეთი დავალებები,
+    რომლებიც ჩვეულებრივ ადამიანის აზროვნებას საჭიროებს.
+    მაგალითად, ხელოვნურ ინტელექტს შეუძლია ტექსტის დამუშავება,
+    სურათების ამოცნობა და კითხვებზე პასუხის გაცემა.
+    """
+
+    long_text = """
+    ხელოვნური ინტელექტი თანამედროვე ტექნოლოგიების ერთ-ერთი
+    ყველაზე მნიშვნელოვანი მიმართულებაა. ხელოვნური ინტელექტის
+    სისტემებს შეუძლიათ დიდი რაოდენობის მონაცემების დამუშავება,
+    მათში არსებული კანონზომიერებების აღმოჩენა და მიღებული
+    ინფორმაციის საფუძველზე შესაბამისი პასუხების მომზადება.
+
+    გენერაციული ხელოვნური ინტელექტი გამოიყენება ტექსტის,
+    გამოსახულებების, მუსიკისა და პროგრამული კოდის შესაქმნელად.
+    ენობრივი მოდელები სწავლობენ დიდი რაოდენობის ტექსტებზე და
+    მომხმარებლის მიერ მიწოდებული მოთხოვნის საფუძველზე ქმნიან
+    პასუხს. მათ შეუძლიათ კითხვებზე პასუხის გაცემა, ტექსტის
+    შეჯამება, თარგმნა და იდეების გენერირება.
+
+    ხელოვნური ინტელექტის გამოყენებისას მნიშვნელოვანია ზუსტად
+    ვიცოდეთ, რამდენად დიდი ინფორმაცია გადაეცემა მოდელს. მოდელები
+    ტექსტს ამუშავებენ ტოკენების სახით. ტოკენი შეიძლება იყოს სიტყვა,
+    სიტყვის ნაწილი, სიმბოლო ან რამდენიმე სიმბოლოს კომბინაცია.
+
+    ტოკენების რაოდენობის ცოდნა მნიშვნელოვანია, რადგან ყველა მოდელს
+    აქვს კონტექსტური ფანჯრის გარკვეული ლიმიტი. თუ conversation
+    history ძალიან დიდი გახდა, შეიძლება საჭირო გახდეს ძველი
+    შეტყობინებების წაშლა ან შეჯამება. ამ გზით პროგრამას შეუძლია
+    შეინარჩუნოს მხოლოდ ყველაზე მნიშვნელოვანი და ბოლო ინფორმაცია.
+
+    Token counting ასევე გვეხმარება API მოთხოვნების ზომის
+    კონტროლში. დიდი მოთხოვნა შეიძლება დაკავშირებული იყოს უფრო
+    მაღალ ხარჯთან და პასუხის დამუშავებასაც მეტი დრო დასჭირდეს.
+    ამიტომ სასარგებლოა მოთხოვნის გაგზავნამდე ტოკენების დათვლა
+    და წინასწარ განსაზღვრულ ლიმიტთან შედარება.
+    """ * 3
+
+    test_texts = [
+        ("მოკლე ტექსტი", short_text),
+        ("საშუალო ტექსტი", medium_text),
+        ("გრძელი ტექსტი", long_text)
+    ]
+
+    for text_name, text in test_texts:
+        print(f"\n--- {text_name} ---")
+        count_text_tokens(text)
+
+
+# ==================================================
+# ამოცანა 2: History Trimming
+# ==================================================
+
+def trim_history(history: list, max_turns: int):
+    """
+    Conversation history-დან აბრუნებს
+    მხოლოდ ბოლო max_turns შეტყობინებას.
+    """
+
+    if max_turns <= 0:
+        return []
+
+    return history[-max_turns:]
+
+
+def history_to_text(history):
+
+
+    history_lines = []
+
+    for message in history:
+        role = message["role"]
+        content = message["content"]
+
+        history_lines.append(f"{role}: {content}")
+
+    return "\n".join(history_lines)
+
+
+def count_history_tokens(history):
+    """
+    Conversation history-ის ტოკენების რაოდენობას ითვლის.
+    """
+
+    history_text = history_to_text(history)
+
+    response = client.models.count_tokens(
+        model=MODEL_NAME,
+        contents=history_text
+    )
+
+    return response.total_tokens
+
+
+def create_conversation_history():
+    """
+    ქმნის ხელოვნურ conversation history-ს,
+    რომელიც 20 შეტყობინებას შეიცავს.
+    """
+
+    history = [
+        {
+            "role": "user",
+            "content": "Gamarjoba, მინდა Python-ის სწავლა."
+        },
+        {
+            "role": "assistant",
+            "content": "გამარჯობა! დავიწყოთ Python-ის საფუძვლებით."
+        },
+        {
+            "role": "user",
+            "content": "რა არის ცვლადი?"
+        },
+        {
+            "role": "assistant",
+            "content": "ცვლადი არის სახელი, რომელშიც მნიშვნელობას ვინახავთ."
+        },
+        {
+            "role": "user",
+            "content": "როგორ შევქმნა ცვლადი?"
+        },
+        {
+            "role": "assistant",
+            "content": "მაგალითად შეგიძლია დაწერო: name = 'Gvantsa'."
+        },
+        {
+            "role": "user",
+            "content": "რა არის list?"
+        },
+        {
+            "role": "assistant",
+            "content": "List არის მონაცემთა კოლექცია, რომელიც რამდენიმე ელემენტს ინახავს."
+        },
+        {
+            "role": "user",
+            "content": "როგორ შევქმნა list?"
+        },
+        {
+            "role": "assistant",
+            "content": "მაგალითად: numbers = [1, 2, 3, 4, 5]."
+        },
+        {
+            "role": "user",
+            "content": "რა არის for ციკლი?"
+        },
+        {
+            "role": "assistant",
+            "content": "for ციკლი გამოიყენება კოლექციის ელემენტებზე გადასავლელად."
+        },
+        {
+            "role": "user",
+            "content": "შეგიძლია for ციკლის მაგალითი მაჩვენო?"
+        },
+        {
+            "role": "assistant",
+            "content": "მაგალითად: for number in numbers: print(number)."
+        },
+        {
+            "role": "user",
+            "content": "რა არის Python ფუნქცია?"
+        },
+        {
+            "role": "assistant",
+            "content": "ფუნქცია არის კოდის მრავალჯერ გამოყენებადი ნაწილი."
+        },
+        {
+            "role": "user",
+            "content": "როგორ შევქმნა ფუნქცია?"
+        },
+        {
+            "role": "assistant",
+            "content": "ფუნქციის შექმნისთვის გამოიყენება def საკვანძო სიტყვა."
+        },
+        {
+            "role": "user",
+            "content": "რა არის return?"
+        },
+        {
+            "role": "assistant",
+            "content": "return ფუნქციიდან მიღებულ შედეგს აბრუნებს."
+        }
+    ]
+
+    return history
+
+
+def run_task_2():
+    print("\n" + "=" * 60)
+    print("ამოცანა 2 — History Trimming")
+    print("=" * 60)
+
+    full_history = create_conversation_history()
+
+    print(
+        f"\nსრული history-ის შეტყობინებების რაოდენობა: "
+        f"{len(full_history)}"
+    )
+
+    full_history_tokens = count_history_tokens(full_history)
+
+    print(
+        f"სრული history-ის ტოკენების რაოდენობა: "
+        f"{full_history_tokens}"
+    )
+
+    max_turns_options = [4, 6, 10]
+
+    for max_turns in max_turns_options:
+        trimmed_history = trim_history(
+            history=full_history,
+            max_turns=max_turns
+        )
+
+        remaining_tokens = count_history_tokens(trimmed_history)
+
+        print("\n" + "-" * 50)
+        print(f"max_turns = {max_turns}")
+        print(
+            f"დარჩენილი შეტყობინებების რაოდენობა: "
+            f"{len(trimmed_history)}"
+        )
+        print(
+            f"დარჩენილი history-ის ტოკენების რაოდენობა: "
+            f"{remaining_tokens}"
+        )
+
+        print("\nდარჩენილი შეტყობინებები:")
+
+        for message in trimmed_history:
+            print(
+                f"{message['role']}: "
+                f"{message['content']}"
+            )
+
+
+# ==================================================
+# ამოცანა 3: Structured Output
+# ==================================================
+
+class Book(BaseModel):
+    title: str
+    author: str
+    year: int
+    genres: list[str]
+
+
+def get_book_recommendation(genre):
+    """
+    Gemini-სგან ითხოვს წიგნის რეკომენდაციას
+    და პასუხს Book სტრუქტურაში იღებს.
+    """
+
+    prompt = f"""
+    მირჩიე ერთი {genre} ჟანრის წიგნი.
+
+    პასუხი უნდა შეიცავდეს:
+    - წიგნის სათაურს;
+    - ავტორს;
+    - გამოცემის წელს;
+    - ჟანრების სიას.
+
+    დააბრუნე მხოლოდ ერთი წიგნი.
+    """
+
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=Book
+        )
+    )
+
+    # Gemini SDK-ს მიერ უკვე დამუშავებული Pydantic ობიექტი
+    book = response.parsed
+
+    # დამატებითი შემოწმება
+    if not isinstance(book, Book):
+        book = Book.model_validate_json(response.text)
+
+    return book
+
+
+def run_task_3():
+    print("\n" + "=" * 60)
+    print("ამოცანა 3 — Structured Output")
+    print("=" * 60)
+
+    genre = "Mystery"
+
+    try:
+        book = get_book_recommendation(genre)
+
+        print("\nმიღებული წიგნი:")
+        print(f"Title: {book.title}")
+        print(f"Author: {book.author}")
+        print(f"Year: {book.year}")
+        print(f"Genres: {', '.join(book.genres)}")
+
+        print("\nJSON ფორმატი:")
+        print(book.model_dump_json(indent=4))
+
+    except ValidationError as error:
+        print("Gemini-ის პასუხი Book მოდელს არ შეესაბამება.")
+        print(error)
+
+    except Exception as error:
+        print(f"შეცდომა: {error}")
+
+
+
+
+def main():
+    run_task_1()
+    run_task_2()
+    run_task_3()
+
+
+if __name__ == "__main__":
+    main()
