@@ -1,0 +1,299 @@
+import json
+from google import genai
+
+# =====================================================
+# CLIENT
+# =====================================================
+
+client = genai.Client(
+    api_key="YOUR_API_KEY"
+)
+
+# =====================================================
+# TOOLS
+# =====================================================
+
+def calculate(expression: str):
+    try:
+        result = eval(expression)
+        return {"result": result}
+
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def get_currency_rate(
+    from_currency: str,
+    to_currency: str
+):
+    rates = {
+        ("USD", "GEL"): 2.71,
+        ("EUR", "USD"): 1.08,
+        ("EUR", "GEL"): 2.92,
+        ("USD", "EUR"): 0.93,
+    }
+
+    rate = rates.get(
+        (
+            from_currency.upper(),
+            to_currency.upper()
+        )
+    )
+
+    if rate is None:
+        return {
+            "error":
+            "კურსი ვერ მოიძებნა"
+        }
+
+    return {
+        "rate": rate
+    }
+
+
+# =====================================================
+# FUNCTION DECLARATION SCHEMAS
+# =====================================================
+
+calculate_schema = {
+    "name": "calculate",
+
+    "description":
+    """
+    Calculate a mathematical expression
+    and return the result.
+    """,
+
+    "parameters": {
+        "type": "object",
+
+        "properties": {
+            "expression": {
+                "type": "string",
+                "description":
+                "Mathematical expression"
+            }
+        },
+
+        "required": [
+            "expression"
+        ]
+    }
+}
+
+
+currency_schema = {
+    "name": "get_currency_rate",
+
+    "description":
+    """
+    Get exchange rate between
+    two currencies.
+    """,
+
+    "parameters": {
+        "type": "object",
+
+        "properties": {
+
+            "from_currency": {
+                "type": "string"
+            },
+
+            "to_currency": {
+                "type": "string"
+            }
+        },
+
+        "required": [
+            "from_currency",
+            "to_currency"
+        ]
+    }
+}
+
+tools = [
+    {
+        "function_declarations": [
+            calculate_schema,
+            currency_schema
+        ]
+    }
+]
+
+# =====================================================
+# TOOL MAPPING
+# =====================================================
+
+tool_mapping = {
+    "calculate": calculate,
+    "get_currency_rate":
+        get_currency_rate
+}
+
+
+# =====================================================
+# HANDLE TOOL CALLS
+# =====================================================
+
+def execute_tool_call(fc):
+
+    name = fc.name
+
+    args = dict(fc.args)
+
+    if name not in tool_mapping:
+
+        return {
+            "tool": name,
+            "error":
+            f"Unknown tool {name}"
+        }
+
+    try:
+
+        result = tool_mapping[name](
+            **args
+        )
+
+        return result
+
+    except Exception as e:
+
+        return {
+            "tool": name,
+            "error": str(e)
+        }
+
+
+# =====================================================
+# AGENT
+# =====================================================
+
+def ask_agent(user_question):
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=user_question,
+        config={
+            "tools": tools
+        }
+    )
+
+    function_calls = []
+
+    for part in response.candidates[0].content.parts:
+
+        if hasattr(part, "function_call") \
+                and part.function_call:
+
+            function_calls.append(
+                part.function_call
+            )
+
+    if not function_calls:
+
+        print(response.text)
+        return
+
+    function_responses = []
+
+    print("\n=== TOOL RESULTS ===\n")
+
+    for fc in function_calls:
+
+        result = execute_tool_call(fc)
+
+        print(
+            fc.name,
+            "->",
+            result
+        )
+
+        function_responses.append(
+            {
+                "tool_name":
+                    fc.name,
+
+                "response":
+                    result
+            }
+        )
+
+    followup_prompt = f"""
+User Question:
+
+{user_question}
+
+Tool Results:
+
+{json.dumps(function_responses, indent=2)}
+
+Generate final answer for user.
+"""
+
+    final_response = (
+        client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=followup_prompt
+        )
+    )
+
+    print("\n=== FINAL ANSWER ===\n")
+
+    print(final_response.text)
+
+    print("\n")
+    print("=" * 70)
+    print("\n")
+
+
+# =====================================================
+# TASK 1 TESTS
+# =====================================================
+
+ask_agent(
+    "გამოთვალე 27 * 14"
+)
+
+ask_agent(
+    "რა არის 125 გაყოფილი 5-ზე"
+)
+
+ask_agent(
+    "მითხარი რა კურსია ევროს დოლართან"
+)
+
+ask_agent(
+    "გამოთვალე (18 + 7) * 3"
+)
+
+# ================================
+# TASK 2 TESTS
+# =====================================================
+
+ask_agent(
+    """
+გამოთვალე 45 * 8
+და ამავე დროს მითხარი
+რა კურსია დოლარის ლართან
+და ევროს დოლართან
+"""
+)
+
+ask_agent(
+    """
+რა არის 1000 გაყოფილი 25-ზე?
+
+ასევე მითხარი
+დღევანდელი კურსი USD-GEL
+"""
+)
+
+ask_agent(
+    """
+გამოთვალე 9 ** 3
+და მითხარი
+რა ღირს 50 ევრო ლარში
+"""
+)
