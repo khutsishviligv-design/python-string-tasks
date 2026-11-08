@@ -1,0 +1,194 @@
+from sqlalchemy import create_engine, String, Integer, select
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+
+
+# --------------------------------------------------
+# 1. CREATE ENGINE
+# --------------------------------------------------
+
+DATABASE_URL = "postgresql+psycopg2://username:password@localhost:5432/database_name"
+
+engine = create_engine(DATABASE_URL)
+
+
+# --------------------------------------------------
+# 2. CREATE BASE CLASS
+# --------------------------------------------------
+
+class Base(DeclarativeBase):
+    pass
+
+
+# --------------------------------------------------
+# 3. CREATE BOOK MODEL
+# --------------------------------------------------
+
+class Book(Base):
+    __tablename__ = "books"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String)
+    author: Mapped[str] = mapped_column(String)
+    publish_year: Mapped[int] = mapped_column(Integer)
+
+    def __repr__(self):
+        return (
+            f"Book(id={self.id}, "
+            f"title='{self.title}', "
+            f"author='{self.author}', "
+            f"publish_year={self.publish_year})"
+        )
+
+
+# --------------------------------------------------
+# 4. CREATE TABLE
+# --------------------------------------------------
+
+Base.metadata.create_all(engine)
+
+
+# --------------------------------------------------
+# 5. CREATE SESSION
+# --------------------------------------------------
+
+Session = sessionmaker(bind=engine)
+
+session = Session()
+
+
+# --------------------------------------------------
+# 6. ADD AT LEAST 5 BOOKS
+# --------------------------------------------------
+
+book1 = Book(
+    title="Harry Potter",
+    author="J.K. Rowling",
+    publish_year=1997
+)
+
+book2 = Book(
+    title="The Hobbit",
+    author="J.R.R. Tolkien",
+    publish_year=1937
+)
+
+book3 = Book(
+    title="Atomic Habits",
+    author="James Clear",
+    publish_year=2018
+)
+
+book4 = Book(
+    title="Project Hail Mary",
+    author="Andy Weir",
+    publish_year=2021
+)
+
+book5 = Book(
+    title="The Midnight Library",
+    author="Matt Haig",
+    publish_year=2020
+)
+
+session.add_all([
+    book1,
+    book2,
+    book3,
+    book4,
+    book5
+])
+
+session.commit()
+
+print("5 books added successfully.")
+
+
+# --------------------------------------------------
+# 7. SELECT OPERATIONS
+# --------------------------------------------------
+
+# 7.1 SELECT ALL BOOKS
+
+print("\n--- ALL BOOKS ---")
+
+statement = select(Book)
+
+books = session.scalars(statement).all()
+
+for book in books:
+    print(book)
+
+
+# 7.2 SELECT ONE BOOK BY ID
+
+print("\n--- BOOK WITH ID = 1 ---")
+
+book = session.get(Book, 1)
+
+print(book)
+
+
+# 7.3 BOOKS PUBLISHED AFTER 2015
+
+print("\n--- BOOKS PUBLISHED AFTER 2015 ---")
+
+statement = select(Book).where(Book.publish_year > 2015)
+
+books_after_2015 = session.scalars(statement).all()
+
+for book in books_after_2015:
+    print(book)
+
+
+# --------------------------------------------------
+# 8. UPDATE
+# --------------------------------------------------
+
+print("\n--- UPDATE BOOK ---")
+
+book_to_update = session.get(Book, 1)
+
+if book_to_update:
+    book_to_update.author = "Joanne Rowling"
+
+    session.commit()
+
+    print("Book updated:")
+    print(book_to_update)
+
+
+# --------------------------------------------------
+# 9. DELETE
+# --------------------------------------------------
+
+print("\n--- DELETE BOOK ---")
+
+book_to_delete = session.get(Book, 2)
+
+if book_to_delete:
+    session.delete(book_to_delete)
+
+    session.commit()
+
+    print("Book with ID 2 deleted.")
+
+
+# Check books after DELETE
+
+print("\n--- BOOKS AFTER DELETE ---")
+
+statement = select(Book)
+
+remaining_books = session.scalars(statement).all()
+
+for book in remaining_books:
+    print(book)
+
+
+# --------------------------------------------------
+# 10. CLOSE SESSION
+# --------------------------------------------------
+
+session.close()
+
+print("\nSession closed.")
