@@ -1,0 +1,271 @@
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel
+from sqlalchemy import (
+    create_engine,
+    Column,
+    Integer,
+    String,
+    Boolean,
+    select
+)
+from sqlalchemy.orm import (
+    declarative_base,
+    sessionmaker,
+    Session
+)
+
+# ==================================================
+# DATABASE CONFIG
+# ==================================================
+
+USERNAME = "postgres"
+PASSWORD = "1234"
+HOST = "localhost"
+PORT = "5432"
+DATABASE = "travel_db"
+
+DATABASE_URL = (
+    f"postgresql+psycopg2://{USERNAME}:{PASSWORD}"
+    f"@{HOST}:{PORT}/{DATABASE}"
+)
+
+engine = create_engine(
+    DATABASE_URL,
+    echo=True
+)
+
+SessionLocal = sessionmaker(
+    bind=engine,
+    autoflush=False,
+    autocommit=False
+)
+
+Base = declarative_base()
+
+# ==================================================
+# MODEL
+# ==================================================
+
+class Trip(Base):
+    __tablename__ = "trips"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    destination = Column(
+        String(100),
+        nullable=False
+    )
+
+    country = Column(
+        String(50),
+        nullable=False
+    )
+
+    days = Column(
+        Integer,
+        nullable=False
+    )
+
+    budget = Column(
+        Integer,
+        nullable=False
+    )
+
+    is_completed = Column(
+        Boolean,
+        default=False
+    )
+
+# ==================================================
+# CREATE TABLE
+# ==================================================
+
+Base.metadata.create_all(engine)
+
+# ==================================================
+# PYDANTIC SCHEMAS
+# ==================================================
+
+class TripCreate(BaseModel):
+    destination: str
+    country: str
+    days: int
+    budget: int
+    is_completed: bool
+
+
+class TripResponse(BaseModel):
+    id: int
+    destination: str
+    country: str
+    days: int
+    budget: int
+    is_completed: bool
+
+    class Config:
+        from_attributes = True
+
+
+# ==================================================
+# FASTAPI
+# ==================================================
+
+app = FastAPI(
+    title="Travel CRUD API"
+)
+
+# ==================================================
+# DATABASE DEPENDENCY
+# ==================================================
+
+def get_db():
+    db = SessionLocal()
+
+    try:
+        yield db
+    finally:
+        db.close()
+
+# ==================================================
+# CREATE TRIP
+# POST /trips
+# ==================================================
+
+@app.post(
+    "/trips",
+    response_model=TripResponse
+)
+def create_trip(
+    trip: TripCreate,
+    db: Session = Depends(get_db)
+):
+
+    new_trip = Trip(
+        destination=trip.destination,
+        country=trip.country,
+        days=trip.days,
+        budget=trip.budget,
+        is_completed=trip.is_completed
+    )
+
+    db.add(new_trip)
+    db.commit()
+    db.refresh(new_trip)
+
+    return new_trip
+
+# ==================================================
+# GET ALL TRIPS
+# GET /trips
+# ==================================================
+
+@app.get(
+    "/trips",
+    response_model=list[TripResponse]
+)
+def get_all_trips(
+    db: Session = Depends(get_db)
+):
+
+    trips = db.execute(
+        select(Trip)
+    ).scalars().all()
+
+    return trips
+
+# ==================================================
+# GET TRIP BY ID
+# GET /trips/{trip_id}
+# ==================================================
+
+@app.get(
+    "/trips/{trip_id}",
+    response_model=TripResponse
+)
+def get_trip(
+    trip_id: int,
+    db: Session = Depends(get_db)
+):
+
+    trip = db.execute(
+        select(Trip)
+        .where(Trip.id == trip_id)
+    ).scalar_one_or_none()
+
+    if trip is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Trip not found"
+        )
+
+    return trip
+
+# ==================================================
+# UPDATE TRIP
+# PUT /trips/{trip_id}
+# ==================================================
+
+@app.put(
+    "/trips/{trip_id}",
+    response_model=TripResponse
+)
+def update_trip(
+    trip_id: int,
+    updated_trip: TripCreate,
+    db: Session = Depends(get_db)
+):
+
+    trip = db.execute(
+        select(Trip)
+        .where(Trip.id == trip_id)
+    ).scalar_one_or_none()
+
+    if trip is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Trip not found"
+        )
+
+    trip.destination = updated_trip.destination
+    trip.country = updated_trip.country
+    trip.days = updated_trip.days
+    trip.budget = updated_trip.budget
+    trip.is_completed = updated_trip.is_completed
+
+    db.commit()
+    db.refresh(trip)
+
+    return trip
+
+# ==================================================
+# DELETE TRIP
+# DELETE /trips/{trip_id}
+# ==================================================
+
+@app.delete("/trips/{trip_id}")
+def delete_trip(
+    trip_id: int,
+    db: Session = Depends(get_db)
+):
+
+    trip = db.execute(
+        select(Trip)
+        .where(Trip.id == trip_id)
+    ).scalar_one_or_none()
+
+    if trip is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Trip not found"
+        )
+
+    db.delete(trip)
+    db.commit()
+
+    return {
+        "message": f"Trip {trip_id} deleted successfully"
+    }
