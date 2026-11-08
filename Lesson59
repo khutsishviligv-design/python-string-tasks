@@ -1,0 +1,326 @@
+from langchain_core.tools import tool
+from langchain_core.prompts import PromptTemplate
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.agents.output_parsers import ReActSingleInputOutputParser
+
+
+# ==================================================
+# TOOLS
+# ==================================================
+
+@tool
+def get_most_requested_book() -> str:
+    """Returns the title of the currently most requested book in the library."""
+
+    return "Clean Code"
+
+
+@tool
+def get_book_location(book_title: str) -> str:
+    """Returns the shelf and floor location of the given book."""
+
+    locations = {
+        "Clean Code": "3rd floor, shelf B-17",
+        "Design Patterns": "2nd floor, shelf A-09",
+        "The Pragmatic Programmer": "4th floor, shelf C-04"
+    }
+
+    return locations.get(
+        book_title,
+        "Book not found"
+    )
+
+
+# ==================================================
+# TOOL RUNNER
+# ==================================================
+
+def run_tool(tool_name, tool_input):
+
+    tool_map = {
+        "get_most_requested_book":
+            get_most_requested_book,
+
+        "get_book_location":
+            get_book_location,
+    }
+
+    if tool_name not in tool_map:
+        return "Unknown tool"
+
+    if tool_input.strip():
+
+        return tool_map[tool_name].invoke(
+            tool_input
+        )
+
+    return tool_map[tool_name].invoke({})
+
+
+# ==================================================
+# LLM
+# ==================================================
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    google_api_key="YOUR_API_KEY",
+    temperature=0
+)
+
+# ==================================================
+# PROMPT
+# ==================================================
+
+template = """
+Answer the following question.
+
+You have access to these tools:
+
+get_most_requested_book
+get_book_location
+
+Use the format:
+
+Question: question here
+Thought: think
+Action: tool name
+Action Input: input
+Observation: tool result
+...
+Thought: I now know the answer
+Final Answer: answer
+
+Question: {question}
+
+{agent_scratchpad}
+"""
+
+prompt = PromptTemplate.from_template(
+    template
+)
+
+parser = ReActSingleInputOutputParser()
+
+chain = prompt | llm | parser
+
+# ==================================================
+# AGENT
+# ==================================================
+
+question = (
+    "რომელ თაროზე და რა სართულზეა "
+    "ბიბლიოთეკაში ამჟამად "
+    "ყველაზე მოთხოვნადი წიგნი?"
+)
+
+scratchpad = ""
+
+MAX_STEPS = 5
+
+for step in range(MAX_STEPS):
+
+    result = chain.invoke(
+        {
+            "question": question,
+            "agent_scratchpad": scratchpad
+        }
+    )
+
+    if hasattr(result, "return_values"):
+
+        print("\nFINAL ANSWER\n")
+
+        print(
+            result.return_values["output"]
+        )
+
+        break
+
+    tool_name = result.tool
+    tool_input = result.tool_input
+
+    print(
+        f"\nThought Step {step + 1}"
+    )
+
+    print(
+        "Action:",
+        tool_name
+    )
+
+    print(
+        "Action Input:",
+        tool_input
+    )
+
+    observation = run_tool(
+        tool_name,
+        tool_input
+    )
+
+    print(
+        "Observation:",
+        observation
+    )
+
+    scratchpad += f"""
+Action: {tool_name}
+Action Input: {tool_input}
+Observation: {observation}
+"""
+
+else:
+
+    print(
+        "Could not reach final answer "
+        "within 5 steps."
+    )
+
+#amocana 2
+
+from langchain import hub
+
+from langchain.agents import (
+    create_react_agent,
+    AgentExecutor
+)
+
+from langchain_core.tools import tool
+
+from langchain_google_genai import (
+    ChatGoogleGenerativeAI
+)
+
+# ==================================================
+# TOOLS
+# ==================================================
+
+@tool
+def get_most_requested_book() -> str:
+    """Returns the title of the currently most requested book in the library."""
+
+    return "Clean Code"
+
+
+@tool
+def get_book_location(
+    book_title: str
+) -> str:
+    """Returns the shelf and floor location of the given book."""
+
+    locations = {
+        "Clean Code":
+            "3rd floor, shelf B-17",
+
+        "Design Patterns":
+            "2nd floor, shelf A-09",
+
+        "The Pragmatic Programmer":
+            "4th floor, shelf C-04"
+    }
+
+    return locations.get(
+        book_title,
+        "Book not found"
+    )
+
+
+tools = [
+    get_most_requested_book,
+    get_book_location
+]
+
+# ==================================================
+# MODEL
+# ==================================================
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    google_api_key="YOUR_API_KEY",
+    temperature=0
+)
+
+# ==================================================
+# REACT PROMPT
+# ==================================================
+
+prompt = hub.pull(
+    "hwchase17/react"
+)
+
+# ==================================================
+# AGENT
+# ==================================================
+
+agent = create_react_agent(
+    llm=llm,
+    tools=tools,
+    prompt=prompt
+)
+
+agent_executor = AgentExecutor(
+    agent=agent,
+    tools=tools,
+    verbose=True,
+    return_intermediate_steps=True,
+    max_iterations=5
+)
+
+# ==================================================
+# RUN
+# ==================================================
+
+result = agent_executor.invoke(
+    {
+        "input":
+        "რომელ თაროზე და რა სართულზეა "
+        "ბიბლიოთეკაში ამჟამად "
+        "ყველაზე მოთხოვნადი წიგნი?"
+    }
+)
+
+# ==================================================
+# INTERMEDIATE STEPS
+# ==================================================
+
+print("\n")
+print("=" * 70)
+print("INTERMEDIATE STEPS")
+print("=" * 70)
+
+for action, observation in result[
+    "intermediate_steps"
+]:
+
+    print()
+
+    print(
+        "Tool:",
+        action.tool
+    )
+
+    print(
+        "Input:",
+        action.tool_input
+    )
+
+    print(
+        "Observation:",
+        observation
+    )
+
+# ==================================================
+# FINAL ANSWER
+# ==================================================
+
+print("\n")
+print("=" * 70)
+print("FINAL ANSWER")
+print("=" * 70)
+
+print(
+    result["output"]
+)
+
+
+
