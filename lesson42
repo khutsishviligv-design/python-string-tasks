@@ -1,0 +1,171 @@
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel
+from sqlalchemy import (
+    create_engine,
+    Column,
+    Integer,
+    String,
+    Boolean,
+    select
+)
+from sqlalchemy.orm import (
+    declarative_base,
+    sessionmaker,
+    Session
+)
+
+# ==================================================
+# DATABASE
+# ==================================================
+
+DATABASE_URL = (
+    "postgresql+psycopg2://postgres:1234@localhost:5432/travel_db"
+)
+
+engine = create_engine(
+    DATABASE_URL,
+    echo=True
+)
+
+SessionLocal = sessionmaker(
+    bind=engine,
+    autoflush=False,
+    autocommit=False
+)
+
+Base = declarative_base()
+
+# ==================================================
+# MODEL
+# ==================================================
+
+class Trip(Base):
+    __tablename__ = "trips"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    destination = Column(
+        String(100),
+        nullable=False
+    )
+
+    country = Column(
+        String(50),
+        nullable=False
+    )
+
+    days = Column(
+        Integer,
+        nullable=False
+    )
+
+    budget = Column(
+        Integer,
+        nullable=False
+    )
+
+    is_completed = Column(
+        Boolean,
+        default=False
+    )
+
+# ==================================================
+# CREATE TABLE
+# ==================================================
+
+Base.metadata.create_all(engine)
+
+# ==================================================
+# PYDANTIC SCHEMAS
+# ==================================================
+
+class TripCreate(BaseModel):
+    destination: str
+    country: str
+    days: int
+    budget: int
+    is_completed: bool
+
+
+class TripResponse(BaseModel):
+    id: int
+    destination: str
+    country: str
+    days: int
+    budget: int
+    is_completed: bool
+
+    class Config:
+        from_attributes = True
+
+# ==================================================
+# FASTAPI
+# ==================================================
+
+app = FastAPI()
+
+# ==================================================
+# DB SESSION
+# ==================================================
+
+def get_db():
+    db = SessionLocal()
+
+    try:
+        yield db
+
+    finally:
+        db.close()
+
+# ==================================================
+# CREATE TRIP
+# ==================================================
+
+@app.post(
+    "/trips",
+    response_model=TripResponse
+)
+def create_trip(
+    trip: TripCreate,
+    db: Session = Depends(get_db)
+):
+
+    new_trip = Trip(
+        destination=trip.destination,
+        country=trip.country,
+        days=trip.days,
+        budget=trip.budget,
+        is_completed=trip.is_completed
+    )
+
+    db.add(new_trip)
+    db.commit()
+    db.refresh(new_trip)
+
+    return new_trip
+
+# ==================================================
+# GET ALL TRIPS
+# ==================================================
+
+@app.get(
+    "/trips",
+    response_model=list[TripResponse]
+)
+def get_trips(
+    db: Session = Depends(get_db)
+):
+
+    trips = db.execute(
+        select(Trip)
+    ).scalars().all()
+
+    return trips
+
+# ==================================================
+# GET ONE TRIP
+# ==================================================
+
+@app.get(
+    "/trips/{trip_id}",
+    response_model
