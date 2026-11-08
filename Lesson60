@@ -1,0 +1,298 @@
+from typing import TypedDict
+
+from langgraph.graph import (
+    StateGraph,
+    START,
+    END
+)
+
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+# =====================================================
+# LLM
+# =====================================================
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    temperature=0.5,
+    google_api_key="YOUR_API_KEY"
+)
+
+# =====================================================
+# TASK 1
+# BLOG POST GENERATOR
+# =====================================================
+
+class BlogState(TypedDict):
+    raw_idea: str
+    cleaned_idea: str
+    expanded_content: str
+    final_post: str
+
+
+def clean_idea(state: BlogState):
+
+    cleaned = state["raw_idea"].strip()
+
+    cleaned = cleaned.replace("\n", " ")
+
+    while "  " in cleaned:
+        cleaned = cleaned.replace("  ", " ")
+
+    return {
+        "cleaned_idea": cleaned
+    }
+
+
+def expand_content(state: BlogState):
+
+    prompt = f"""
+Expand the following idea into a clear and coherent paragraph.
+
+Requirements:
+- 4 to 6 sentences
+- informative tone
+- preserve original meaning
+
+Idea:
+{state["cleaned_idea"]}
+"""
+
+    response = llm.invoke(prompt)
+
+    return {
+        "expanded_content": response.content
+    }
+
+
+def create_final_post(state: BlogState):
+
+    prompt = f"""
+Create a complete blog post.
+
+Requirements:
+- Add a title
+- Use the provided content
+- Add a short conclusion
+
+Content:
+{state["expanded_content"]}
+"""
+
+    response = llm.invoke(prompt)
+
+    return {
+        "final_post": response.content
+    }
+
+
+blog_graph = StateGraph(BlogState)
+
+blog_graph.add_node(
+    "clean_idea",
+    clean_idea
+)
+
+blog_graph.add_node(
+    "expand_content",
+    expand_content
+)
+
+blog_graph.add_node(
+    "create_final_post",
+    create_final_post
+)
+
+blog_graph.add_edge(
+    START,
+    "clean_idea"
+)
+
+blog_graph.add_edge(
+    "clean_idea",
+    "expand_content"
+)
+
+blog_graph.add_edge(
+    "expand_content",
+    "create_final_post"
+)
+
+blog_graph.add_edge(
+    "create_final_post",
+    END
+)
+
+blog_app = blog_graph.compile()
+
+# =====================================================
+# TASK 2
+# CUSTOMER FEEDBACK PROCESSOR
+# =====================================================
+
+class FeedbackState(TypedDict):
+    feedback: str
+    main_issues: str
+    suggested_actions: str
+    final_reply: str
+
+
+def extract_issues(state: FeedbackState):
+
+    prompt = f"""
+Read the customer feedback and identify
+the main issues.
+
+Feedback:
+{state['feedback']}
+
+Return only the key issues.
+"""
+
+    response = llm.invoke(prompt)
+
+    return {
+        "main_issues": response.content
+    }
+
+
+def suggest_actions(state: FeedbackState):
+
+    prompt = f"""
+The customer reported these issues:
+
+{state['main_issues']}
+
+Suggest actions the company should take.
+
+Be practical and concise.
+"""
+
+    response = llm.invoke(prompt)
+
+    return {
+        "suggested_actions": response.content
+    }
+
+
+def generate_reply(state: FeedbackState):
+
+    prompt = f"""
+Write a professional and polite response
+to the customer.
+
+Customer Feedback:
+{state['feedback']}
+
+Issues:
+{state['main_issues']}
+
+Suggested Actions:
+{state['suggested_actions']}
+
+Requirements:
+- Apologize politely
+- Acknowledge the problem
+- Explain that improvements will be made
+- Professional tone
+"""
+
+    response = llm.invoke(prompt)
+
+    return {
+        "final_reply": response.content
+    }
+
+
+feedback_graph = StateGraph(
+    FeedbackState
+)
+
+feedback_graph.add_node(
+    "extract_issues",
+    extract_issues
+)
+
+feedback_graph.add_node(
+    "suggest_actions",
+    suggest_actions
+)
+
+feedback_graph.add_node(
+    "generate_reply",
+    generate_reply
+)
+
+feedback_graph.add_edge(
+    START,
+    "extract_issues"
+)
+
+feedback_graph.add_edge(
+    "extract_issues",
+    "suggest_actions"
+)
+
+feedback_graph.add_edge(
+    "suggest_actions",
+    "generate_reply"
+)
+
+feedback_graph.add_edge(
+    "generate_reply",
+    END
+)
+
+feedback_app = feedback_graph.compile()
+
+# =====================================================
+# TEST TASK 1
+# =====================================================
+
+print("\n")
+print("=" * 60)
+print("TASK 1 - BLOG POST")
+print("=" * 60)
+
+blog_result = blog_app.invoke(
+    {
+        "raw_idea": """
+        We spend too much time on our phones.
+
+        It hurts our eyes
+        and also affects our sleep quality.
+
+        """
+    }
+)
+
+print(blog_result["final_post"])
+
+# =====================================================
+# TEST TASK 2
+# =====================================================
+
+print("\n")
+print("=" * 60)
+print("TASK 2 - FEEDBACK PROCESSOR")
+print("=" * 60)
+
+feedback_result = feedback_app.invoke(
+    {
+        "feedback": """
+The product arrived two days late and the
+packaging was completely damaged.
+
+I am very disappointed with the service.
+"""
+    }
+)
+
+print("\nMAIN ISSUES:\n")
+print(feedback_result["main_issues"])
+
+print("\nSUGGESTED ACTIONS:\n")
+print(feedback_result["suggested_actions"])
+
+print("\nFINAL REPLY:\n")
+print(feedback_result["final_reply"])
