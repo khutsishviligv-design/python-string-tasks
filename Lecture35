@@ -69,4 +69,259 @@ CREATE TABLE order_items (
 
 
 -- =========================================================
--- მონაცემების 
+-- მონაცემების დამატება
+-- =========================================================
+
+
+-- მომხმარებლების დამატება
+
+INSERT INTO customers (name, phone, email)
+VALUES
+('გიორგი ბერიძე', '555111111', 'giorgi@mail.com'),
+('ნინო კაპანაძე', '555222222', 'nino@mail.com'),
+('ლევან გელაშვილი', '555333333', 'levan@mail.com');
+
+
+-- კატეგორიების დამატება
+
+INSERT INTO categories (category_name)
+VALUES
+('Electronics'),
+('Furniture');
+
+
+-- პროდუქტების დამატება
+
+INSERT INTO products (product_name, category_id, price)
+VALUES
+('Laptop', 1, 3200.00),
+('Mouse', 1, 80.00),
+('Keyboard', 1, 150.00),
+('Chair', 2, 420.00),
+('Desk', 2, 850.00),
+('Monitor', 1, 900.00);
+
+
+-- შეკვეთების დამატება
+
+INSERT INTO orders (id, customer_id, order_date)
+VALUES
+(1, 1, '2026-06-01'),
+(2, 2, '2026-06-03'),
+(3, 3, '2026-06-05'),
+(4, 1, '2026-06-10');
+
+
+-- შეკვეთილი პროდუქტების დამატება
+
+INSERT INTO order_items (order_id, product_id, quantity)
+VALUES
+(1, 1, 1),
+(1, 2, 2),
+(2, 3, 1),
+(3, 4, 4),
+(3, 5, 1),
+(4, 6, 2);
+
+
+-- =========================================================
+-- ცხრილებში დამატებული მონაცემების შემოწმება
+-- =========================================================
+
+SELECT * FROM customers;
+
+SELECT * FROM categories;
+
+SELECT * FROM products;
+
+SELECT * FROM orders;
+
+SELECT * FROM order_items;
+
+
+-- =========================================================
+-- ნაწილი 2: JOIN მოთხოვნები
+-- =========================================================
+
+
+-- =========================================================
+-- 1. ყველა შეკვეთის სრული ინფორმაცია
+-- =========================================================
+
+SELECT
+    orders.id AS "OrderID",
+    customers.name AS "CustomerName",
+    customers.email AS "Email",
+    products.product_name AS "ProductName",
+    products.price AS "Price",
+    order_items.quantity AS "Quantity",
+    orders.order_date AS "OrderDate"
+FROM orders
+JOIN customers
+    ON orders.customer_id = customers.id
+JOIN order_items
+    ON orders.id = order_items.order_id
+JOIN products
+    ON order_items.product_id = products.id
+ORDER BY orders.id;
+
+
+-- =========================================================
+-- 2. მომხმარებლების და მათ მიერ შეკვეთილი პროდუქტების სია
+-- =========================================================
+
+SELECT
+    customers.name AS "CustomerName",
+    products.product_name AS "ProductName"
+FROM customers
+JOIN orders
+    ON customers.id = orders.customer_id
+JOIN order_items
+    ON orders.id = order_items.order_id
+JOIN products
+    ON order_items.product_id = products.id
+ORDER BY customers.id, orders.id, order_items.id;
+
+
+-- =========================================================
+-- 3. პროდუქტების სია და მათი მყიდველები
+-- =========================================================
+
+SELECT
+    products.product_name AS "ProductName",
+    products.price AS "Price",
+    customers.name AS "CustomerName"
+FROM products
+JOIN order_items
+    ON products.id = order_items.product_id
+JOIN orders
+    ON order_items.order_id = orders.id
+JOIN customers
+    ON orders.customer_id = customers.id
+ORDER BY products.id;
+
+
+-- =========================================================
+-- 4. ყველა შეკვეთის დეტალური ინფორმაცია
+-- =========================================================
+
+SELECT
+    orders.id AS "OrderID",
+    customers.name AS "CustomerName",
+    products.product_name AS "ProductName",
+    order_items.quantity AS "Quantity",
+    orders.order_date AS "OrderDate"
+FROM orders
+JOIN customers
+    ON orders.customer_id = customers.id
+JOIN order_items
+    ON orders.id = order_items.order_id
+JOIN products
+    ON order_items.product_id = products.id
+ORDER BY orders.id, order_items.id;
+
+
+-- =========================================================
+-- 5. ყველა პროდუქტი და მისი კატეგორია
+-- =========================================================
+
+SELECT
+    products.product_name AS "ProductName",
+    categories.category_name AS "Category"
+FROM products
+JOIN categories
+    ON products.category_id = categories.id
+ORDER BY products.id;
+
+
+-- =========================================================
+-- 6. Electronics კატეგორიის პროდუქტები
+-- =========================================================
+
+SELECT
+    products.product_name AS "ProductName",
+    categories.category_name AS "Category",
+    products.price AS "Price"
+FROM products
+JOIN categories
+    ON products.category_id = categories.id
+WHERE categories.category_name = 'Electronics'
+ORDER BY products.id;
+
+
+-- =========================================================
+-- 7. გიორგი ბერიძის შეკვეთები
+-- =========================================================
+
+SELECT
+    orders.id AS "OrderID",
+    customers.name AS "CustomerName",
+    products.product_name AS "ProductName",
+    order_items.quantity AS "Quantity"
+FROM customers
+JOIN orders
+    ON customers.id = orders.customer_id
+JOIN order_items
+    ON orders.id = order_items.order_id
+JOIN products
+    ON order_items.product_id = products.id
+WHERE customers.name = 'გიორგი ბერიძე'
+ORDER BY orders.id, order_items.id;
+
+
+-- =========================================================
+-- 8. 2026-06-05 თარიღში გაყიდული პროდუქტები
+-- =========================================================
+
+SELECT
+    orders.order_date AS "OrderDate",
+    customers.name AS "CustomerName",
+    products.product_name AS "ProductName",
+    order_items.quantity AS "Quantity"
+FROM orders
+JOIN customers
+    ON orders.customer_id = customers.id
+JOIN order_items
+    ON orders.id = order_items.order_id
+JOIN products
+    ON order_items.product_id = products.id
+WHERE orders.order_date = '2026-06-05'
+ORDER BY order_items.id;
+
+
+-- =========================================================
+-- 9. მომხმარებლების სრული შესყიდვების ისტორია
+-- =========================================================
+
+SELECT
+    customers.name AS "CustomerName",
+    customers.email AS "Email",
+    products.product_name AS "ProductName",
+    order_items.quantity AS "Quantity"
+FROM customers
+JOIN orders
+    ON customers.id = orders.customer_id
+JOIN order_items
+    ON orders.id = order_items.order_id
+JOIN products
+    ON order_items.product_id = products.id
+ORDER BY customers.id, orders.id, order_items.id;
+
+
+-- =========================================================
+-- 10. პროდუქტები, რომლებიც ერთზე მეტი რაოდენობით არის შეძენილი
+-- =========================================================
+
+SELECT
+    customers.name AS "CustomerName",
+    products.product_name AS "ProductName",
+    order_items.quantity AS "Quantity"
+FROM customers
+JOIN orders
+    ON customers.id = orders.customer_id
+JOIN order_items
+    ON orders.id = order_items.order_id
+JOIN products
+    ON order_items.product_id = products.id
+WHERE order_items.quantity > 1
+ORDER BY orders.id, order_items.id;
