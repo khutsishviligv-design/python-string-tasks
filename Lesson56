@@ -1,0 +1,372 @@
+import re
+import json
+import psycopg2
+import numpy as np
+
+from pathlib import Path
+from pypdf import PdfReader
+
+# =====================================================
+# POSTGRESQL CONNECTION
+# =====================================================
+
+connection = psycopg2.connect(
+    host="localhost",
+    port="5432",
+    database="chunk_db",
+    user="postgres",
+    password="1234"
+)
+
+cursor = connection.cursor()
+
+# =====================================================
+# TABLE CREATION
+# =====================================================
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS chunks (
+
+    id SERIAL PRIMARY KEY,
+
+    filename VARCHAR(255),
+
+    chunk_index INTEGER,
+
+    content TEXT,
+
+    embedding TEXT
+)
+""")
+
+connection.commit()
+
+# =====================================================
+# PDF READER
+# =====================================================
+
+def read_pdf(file_path):
+
+    reader = PdfReader(file_path)
+
+    text = ""
+
+    for page in reader.pages:
+
+        page_text = page.extract_text()
+
+        if page_text:
+            text += page_text + "\n"
+
+    return text
+
+
+# =====================================================
+# MARKDOWN READER
+# =====================================================
+
+def read_markdown(file_path):
+
+    with open(
+        file_path,
+        "r",
+        encoding="utf-8"
+    ) as file:
+
+        return file.read()
+
+
+# =====================================================
+# UNIVERSAL LOADER
+# =====================================================
+
+def load_document(file_path):
+
+    extension = Path(
+        file_path
+    ).suffix.lower()
+
+    if extension == ".pdf":
+        return read_pdf(file_path)
+
+    if extension == ".md":
+        return read_markdown(file_path)
+
+    raise ValueError(
+        "Unsupported file format"
+    )
+
+
+# =====================================================
+# SENTENCE CHUNKING
+# =====================================================
+
+def sentence_chunking(
+    text,
+    sentences_per_chunk=5
+):
+
+    sentences = re.split(
+        r'(?<=[.!?])\s+',
+        text.strip()
+    )
+
+    sentences = [
+        sentence.strip()
+        for sentence in sentences
+        if sentence.strip()
+    ]
+
+    chunks = []
+
+    for i in range(
+        0,
+        len(sentences),
+        sentences_per_chunk
+    ):
+
+        chunk_text = " ".join(
+            sentences[
+                i:i + sentences_per_chunk
+            ]
+        )
+
+        chunks.append({
+            "chunk_index": len(chunks),
+            "text": chunk_text
+        })
+
+    return chunks
+
+
+# =====================================================
+# SIMPLE EMBEDDING FUNCTION
+# =====================================================
+
+# OpenAI / HuggingFace embeddings
+
+def get_embedding(text):
+
+    vector = np.zeros(26)
+
+    text = text.lower()
+
+    for char in text:
+
+        if "a" <= char <= "z":
+
+            position = (
+                ord(char)
+                - ord("a")
+            )
+
+            vector[position] += 1
+
+    norm = np.linalg.norm(vector)
+
+    if norm != 0:
+        vector = vector / norm
+
+    return vector.tolist()
+
+
+# =====================================================
+# COSINE SIMILARITY
+# =====================================================
+
+def cosine_similarity(a, b):
+
+    a = np.array(a)
+    b = np.array(b)
+
+    denominator = (
+        np.linalg.norm(a)
+        * np.linalg.norm(b)
+    )
+
+    if denominator == 0:
+        return 0
+
+    return np.dot(a, b) / denominator
+
+
+# =====================================================
+# SAVE CHUNKS
+# =====================================================
+
+def save_chunks(
+    filename,
+    chunks
+):
+
+    for chunk in chunks:
+
+        embedding = get_embedding(
+            chunk["text"]
+        )
+
+        cursor.execute(
+            """
+            INSERT INTO chunks
+            (
+                filename,
+                chunk_index,
+                content,
+                embedding
+            )
+            VALUES
+            (
+                %s,
+                %s,
+                %s,
+                %s
+            )
+            """,
+            (
+                filename,
+                chunk["chunk_index"],
+                chunk["text"],
+                json.dumps(embedding)
+            )
+        )
+
+    connection.commit()
+
+
+# =====================================================
+# SEARCH FUNCTION
+# =====================================================
+
+def search_chunks(
+    query,
+    top_k=3,
+    threshold=0.50
+):
+
+    query_embedding = get_embedding(
+        query
+    )
+
+    cursor.execute("""
+        SELECT
+            filename,
+            chunk_index,
+            content,
+            embedding
+        FROM chunks
+    """)
+
+    rows = cursor.fetchall()
+
+    results = []
+
+    for row in rows:
+
+        filename = row[0]
+        chunk_index = row[1]
+        content = row[2]
+
+        embedding = json.loads(
+            row[3]
+        )
+
+        similarity = cosine_similarity(
+            query_embedding,
+            embedding
+        )
+
+        if similarity >= threshold:
+
+            results.append({
+                "filename": filename,
+                "chunk_index": chunk_index,
+                "content": content,
+                "score": similarity
+            })
+
+    results.sort(
+        key=lambda x: x["score"],
+        reverse=True
+    )
+
+    return results[:top_k]
+
+
+# =====================================================
+# MAIN
+# =====================================================
+
+if __name__ == "__main__":
+
+    file_path = "company_handbook.md"
+
+    # თუ PDF-ს ტესტავ:
+    # file_path = "handbook.pdf"
+
+    document_text = load_document(
+        file_path
+    )
+
+    chunks = sentence_chunking(
+        document_text,
+        sentences_per_chunk=5
+    )
+
+    save_chunks(
+        filename=Path(file_path).name,
+        chunks=chunks
+    )
+
+    print(
+        f"\nSaved {len(chunks)} chunks.\n"
+    )
+
+    query = input(
+        "Search query: "
+    )
+
+    results = search_chunks(
+        query=query,
+        top_k=3,
+        threshold=0.50
+    )
+
+    print("\nTOP RESULTS\n")
+
+    for result in results:
+
+        print("=" * 70)
+
+        print(
+            "File:",
+            result["filename"]
+        )
+
+        print(
+            "Chunk Index:",
+            result["chunk_index"]
+        )
+
+        print(
+            "Similarity:",
+            round(
+                result["score"],
+                3
+            )
+        )
+
+        print()
+
+        print(
+            result["content"]
+        )
+
+        print()
+
+
+# =====================================================
+# CLOSE CONNECTION
+# =====================================================
+
+cursor.close()
+connection.close()
