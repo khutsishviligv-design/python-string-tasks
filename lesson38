@@ -1,1 +1,542 @@
+from sqlalchemy import (
+    create_engine,
+    Column,
+    Integer,
+    String,
+    ForeignKey,
+    DateTime
+)
 
+from sqlalchemy.orm import (
+    declarative_base,
+    relationship,
+    sessionmaker,
+    joinedload
+)
+
+from datetime import datetime
+
+# ==========================================================
+# POSTGRESQL CONNECTION
+# ==========================================================
+
+USERNAME = "postgres"
+PASSWORD = "1234"      # შეცვალეთ თქვენი პაროლი
+HOST = "localhost"
+PORT = "5432"
+DATABASE = "online_shop"
+
+DATABASE_URL = (
+    f"postgresql+psycopg2://{USERNAME}:{PASSWORD}"
+    f"@{HOST}:{PORT}/{DATABASE}"
+)
+
+engine = create_engine(
+    DATABASE_URL,
+    echo=True
+)
+
+Base = declarative_base()
+
+# ==========================================================
+# CUSTOMER MODEL
+# ==========================================================
+
+class Customer(Base):
+    __tablename__ = "customers"
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+    name = Column(
+        String,
+        nullable=False
+    )
+
+    email = Column(
+        String,
+        unique=True,
+        nullable=False
+    )
+
+    orders = relationship(
+        "Order",
+        back_populates="customer"
+    )
+
+# ==========================================================
+# ORDER MODEL
+# ==========================================================
+
+class Order(Base):
+    __tablename__ = "orders"
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+    customer_id = Column(
+        Integer,
+        ForeignKey("customers.id"),
+        nullable=False
+    )
+
+    order_date = Column(
+        DateTime,
+        default=datetime.now
+    )
+
+    customer = relationship(
+        "Customer",
+        back_populates="orders"
+    )
+
+    items = relationship(
+        "OrderItem",
+        back_populates="order"
+    )
+
+# ==========================================================
+# PRODUCT MODEL
+# ==========================================================
+
+class Product(Base):
+    __tablename__ = "products"
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+    name = Column(
+        String,
+        nullable=False
+    )
+
+    price = Column(
+        Integer,
+        nullable=False
+    )
+
+    order_items = relationship(
+        "OrderItem",
+        back_populates="product"
+    )
+
+# ==========================================================
+# ORDER ITEM MODEL
+# ==========================================================
+
+class OrderItem(Base):
+    __tablename__ = "order_items"
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+    order_id = Column(
+        Integer,
+        ForeignKey("orders.id"),
+        nullable=False
+    )
+
+    product_id = Column(
+        Integer,
+        ForeignKey("products.id"),
+        nullable=False
+    )
+
+    quantity = Column(
+        Integer,
+        nullable=False
+    )
+
+    order = relationship(
+        "Order",
+        back_populates="items"
+    )
+
+    product = relationship(
+        "Product",
+        back_populates="order_items"
+    )
+
+# ==========================================================
+# CREATE TABLES
+# ==========================================================
+
+Base.metadata.create_all(engine)
+
+# ==========================================================
+# SESSION
+# ==========================================================
+
+Session = sessionmaker(bind=engine)
+session = Session()
+
+# ==========================================================
+# ADD CUSTOMERS
+# ==========================================================
+
+john = Customer(
+    name="John",
+    email="john@gmail.com"
+)
+
+anna = Customer(
+    name="Anna",
+    email="anna@gmail.com"
+)
+
+kate = Customer(
+    name="Kate",
+    email="kate@gmail.com"
+)
+
+bob = Customer(
+    name="Bob",
+    email="bob@gmail.com"
+)
+
+patrick = Customer(
+    name="Patrick",
+    email="patrick@gmail.com"
+)
+
+session.add_all([
+    john,
+    anna,
+    kate,
+    bob,
+    patrick
+])
+
+session.commit()
+
+# ==========================================================
+# ADD PRODUCTS
+# ==========================================================
+
+laptop = Product(
+    name="Laptop",
+    price=1000
+)
+
+phone = Product(
+    name="Phone",
+    price=800
+)
+
+keyboard = Product(
+    name="Keyboard",
+    price=100
+)
+
+mouse = Product(
+    name="Mouse",
+    price=50
+)
+
+monitor = Product(
+    name="Monitor",
+    price=400
+)
+
+headphones = Product(
+    name="Headphones",
+    price=150
+)
+
+tablet = Product(
+    name="Tablet",
+    price=500
+)
+
+camera = Product(
+    name="Camera",
+    price=700
+)
+
+session.add_all([
+    laptop,
+    phone,
+    keyboard,
+    mouse,
+    monitor,
+    headphones,
+    tablet,
+    camera
+])
+
+session.commit()
+
+# ==========================================================
+# CREATE ORDERS
+# ==========================================================
+
+order1 = Order(
+    customer=john
+)
+
+order2 = Order(
+    customer=john
+)
+
+order3 = Order(
+    customer=anna
+)
+
+order4 = Order(
+    customer=kate
+)
+
+order5 = Order(
+    customer=bob
+)
+
+session.add_all([
+    order1,
+    order2,
+    order3,
+    order4,
+    order5
+])
+
+session.commit()
+
+# ==========================================================
+# ORDER ITEMS
+# ==========================================================
+
+item1 = OrderItem(
+    order=order1,
+    product=laptop,
+    quantity=1
+)
+
+item2 = OrderItem(
+    order=order1,
+    product=mouse,
+    quantity=2
+)
+
+item3 = OrderItem(
+    order=order2,
+    product=phone,
+    quantity=1
+)
+
+item4 = OrderItem(
+    order=order2,
+    product=headphones,
+    quantity=1
+)
+
+item5 = OrderItem(
+    order=order3,
+    product=keyboard,
+    quantity=1
+)
+
+item6 = OrderItem(
+    order=order3,
+    product=monitor,
+    quantity=1
+)
+
+item7 = OrderItem(
+    order=order4,
+    product=tablet,
+    quantity=2
+)
+
+item8 = OrderItem(
+    order=order4,
+    product=camera,
+    quantity=1
+)
+
+item9 = OrderItem(
+    order=order5,
+    product=laptop,
+    quantity=1
+)
+
+item10 = OrderItem(
+    order=order5,
+    product=keyboard,
+    quantity=2
+)
+
+item11 = OrderItem(
+    order=order5,
+    product=mouse,
+    quantity=1
+)
+
+session.add_all([
+    item1,
+    item2,
+    item3,
+    item4,
+    item5,
+    item6,
+    item7,
+    item8,
+    item9,
+    item10,
+    item11
+])
+
+session.commit()
+
+# ==========================================================
+# SELECT 1
+# ALL CUSTOMERS
+# ==========================================================
+
+print("\n========== ALL CUSTOMERS ==========\n")
+
+customers = session.query(Customer).all()
+
+for customer in customers:
+    print(f"ID: {customer.id}")
+    print(f"Name: {customer.name}")
+    print(f"Email: {customer.email}")
+    print("-" * 30)
+
+# ==========================================================
+# SELECT 2
+# JOHN'S ORDERS
+# ==========================================================
+
+print("\n========== JOHN'S ORDERS ==========\n")
+
+customer = (
+    session.query(Customer)
+    .options(joinedload(Customer.orders))
+    .filter(Customer.name == "John")
+    .first()
+)
+
+if customer:
+    print("Customer:", customer.name)
+
+    for order in customer.orders:
+        print()
+        print("Order ID:", order.id)
+        print("Order Date:", order.order_date)
+
+# ==========================================================
+# SELECT 3
+# PRODUCTS IN ORDER 1
+# ==========================================================
+
+print("\n========== PRODUCTS IN ORDER 1 ==========\n")
+
+selected_order = (
+    session.query(Order)
+    .options(
+        joinedload(Order.items)
+        .joinedload(OrderItem.product)
+    )
+    .filter(Order.id == order1.id)
+    .first()
+)
+
+if selected_order:
+
+    print("Order ID:", selected_order.id)
+
+    for item in selected_order.items:
+
+        print()
+        print("Product:", item.product.name)
+        print("Quantity:", item.quantity)
+
+# ==========================================================
+# CREATE NEW ORDER
+# ==========================================================
+
+print("\n========== CREATE NEW ORDER ==========\n")
+
+customer = (
+    session.query(Customer)
+    .filter(Customer.name == "Patrick")
+    .first()
+)
+
+new_order = Order(
+    customer=customer
+)
+
+new_item1 = OrderItem(
+    order=new_order,
+    product=laptop,
+    quantity=1
+)
+
+new_item2 = OrderItem(
+    order=new_order,
+    product=mouse,
+    quantity=2
+)
+
+new_item3 = OrderItem(
+    order=new_order,
+    product=headphones,
+    quantity=1
+)
+
+session.add(new_order)
+
+session.add_all([
+    new_item1,
+    new_item2,
+    new_item3
+])
+
+session.commit()
+
+print("New Order Created!")
+print("Order ID:", new_order.id)
+print("Customer:", new_order.customer.name)
+
+for item in new_order.items:
+    print(
+        item.product.name,
+        "Quantity:",
+        item.quantity
+    )
+
+# ==========================================================
+# UPDATE PRODUCT PRICE
+# ==========================================================
+
+print("\n========== UPDATE PRICE ==========\n")
+
+laptop_product = (
+    session.query(Product)
+    .filter(Product.name == "Laptop")
+    .first()
+)
+
+if laptop_product:
+
+    print("Old Price:", laptop_product.price)
+
+    laptop_product.price = 1200
+
+    session.commit()
+
+    print("New Price:", laptop_product.price)
+
+# ==========================================================
+# CLOSE SESSION
+# ==========================================================
+
+session.close()
