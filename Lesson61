@@ -1,0 +1,425 @@
+from typing import TypedDict
+
+from langgraph.graph import (
+    StateGraph,
+    START,
+    END
+)
+
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+
+# ==================================================
+# LLM
+# ==================================================
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    google_api_key="YOUR_API_KEY",
+    temperature=0.3
+)
+
+
+# ==================================================
+# STATE
+# ==================================================
+
+class TextState(TypedDict):
+    user_request: str
+    text: str
+    response: str
+
+
+# ==================================================
+# NODES
+# ==================================================
+
+def summarize_node(state: TextState):
+
+    prompt = f"""
+Summarize the following text in 2-3 sentences.
+
+Text:
+{state["text"]}
+"""
+
+    response = llm.invoke(prompt)
+
+    return {
+        "response": response.content
+    }
+
+
+def translate_node(state: TextState):
+
+    prompt = f"""
+Translate the following text into English.
+
+Text:
+{state["text"]}
+"""
+
+    response = llm.invoke(prompt)
+
+    return {
+        "response": response.content
+    }
+
+
+# ==================================================
+# ROUTER
+# ==================================================
+
+def route_by_request(state: TextState):
+
+    user_request = state["user_request"].lower()
+
+    if (
+        "შეჯამება" in user_request
+        or
+        "summary" in user_request
+    ):
+        return "summarize"
+
+    return "translate"
+
+
+# ==================================================
+# GRAPH
+# ==================================================
+
+graph = StateGraph(TextState)
+
+graph.add_node(
+    "summarize",
+    summarize_node
+)
+
+graph.add_node(
+    "translate",
+    translate_node
+)
+
+graph.add_conditional_edges(
+    START,
+    route_by_request,
+    {
+        "summarize": "summarize",
+        "translate": "translate"
+    }
+)
+
+graph.add_edge(
+    "summarize",
+    END
+)
+
+graph.add_edge(
+    "translate",
+    END
+)
+
+app = graph.compile()
+
+
+# ==================================================
+# TEST 1
+# ==================================================
+
+print("\n====== SUMMARY TEST ======\n")
+
+result = app.invoke(
+    {
+        "user_request": "გააკეთე შეჯამება",
+        "text": """
+Artificial Intelligence is rapidly changing the world.
+Many companies use it to automate repetitive tasks.
+It improves productivity and helps analyze large datasets.
+"""
+    }
+)
+
+print(result["response"])
+
+
+# ==================================================
+# TEST 2
+# ==================================================
+
+print("\n====== TRANSLATE TEST ======\n")
+
+result = app.invoke(
+    {
+        "user_request": "translate this",
+        "text": """
+გამარჯობა, დღეს კარგი ამინდია და
+მე უნივერსიტეტში მივდივარ.
+"""
+    }
+)
+
+print(result["response"])
+
+
+#amocana 2
+from typing import TypedDict, Annotated
+
+from langgraph.graph import (
+    StateGraph,
+    START,
+    END
+)
+
+from langgraph.graph.message import (
+    add_messages
+)
+
+from langchain_core.messages import (
+    HumanMessage,
+    AIMessage,
+    ToolMessage,
+    BaseMessage
+)
+
+from langchain_core.tools import tool
+
+from langchain_google_genai import (
+    ChatGoogleGenerativeAI
+)
+
+
+# ==================================================
+# STATE
+# ==================================================
+
+class AssistantState(TypedDict):
+    messages: Annotated[
+        list[BaseMessage],
+        add_messages
+    ]
+
+
+# ==================================================
+# FAKE DATABASE
+# ==================================================
+
+books = {
+    "1984": {
+        "author": "George Orwell",
+        "year": "1949",
+        "description": "Dystopian novel."
+    }
+}
+
+movies = {
+    "Inception": {
+        "director": "Christopher Nolan",
+        "year": "2010",
+        "genre": "Sci-Fi"
+    }
+}
+
+# ==================================================
+# TOOLS
+# ==================================================
+
+@tool
+def get_book_info(title: str):
+
+    """
+    Get information about a book.
+    """
+
+    return str(
+        books.get(
+            title,
+            "Book not found"
+        )
+    )
+
+
+@tool
+def get_movie_info(title: str):
+
+    """
+    Get information about a movie.
+    """
+
+    return str(
+        movies.get(
+            title,
+            "Movie not found"
+        )
+    )
+
+
+tools = [
+    get_book_info,
+    get_movie_info
+]
+
+
+# ==================================================
+# MODEL
+# ==================================================
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    google_api_key="YOUR_API_KEY"
+)
+
+llm_with_tools = llm.bind_tools(
+    tools
+)
+
+# ==================================================
+# NODE 1
+# ==================================================
+
+def call_model(
+    state: AssistantState
+):
+
+    response = llm_with_tools.invoke(
+        state["messages"]
+    )
+
+    return {
+        "messages": [response]
+    }
+
+
+# ==================================================
+# NODE 2
+# ==================================================
+
+def call_tools(
+    state: AssistantState
+):
+
+    messages = []
+
+    last_message = state["messages"][-1]
+
+    for tool_call in last_message.tool_calls:
+
+        name = tool_call["name"]
+
+        args = tool_call["args"]
+
+        if name == "get_book_info":
+
+            result = get_book_info.invoke(
+                args
+            )
+
+        elif name == "get_movie_info":
+
+            result = get_movie_info.invoke(
+                args
+            )
+
+        messages.append(
+            ToolMessage(
+                content=str(result),
+                tool_call_id=tool_call["id"]
+            )
+        )
+
+    return {
+        "messages": messages
+    }
+
+
+# ==================================================
+# CONDITIONAL EDGE
+# ==================================================
+
+def should_continue(
+    state: AssistantState
+):
+
+    last_message = state["messages"][-1]
+
+    if (
+        hasattr(
+            last_message,
+            "tool_calls"
+        )
+        and
+        last_message.tool_calls
+    ):
+        return "call_tools"
+
+    return END
+
+
+# ==================================================
+# GRAPH
+# ==================================================
+
+graph = StateGraph(
+    AssistantState
+)
+
+graph.add_node(
+    "call_model",
+    call_model
+)
+
+graph.add_node(
+    "call_tools",
+    call_tools
+)
+
+graph.add_edge(
+    START,
+    "call_model"
+)
+
+graph.add_conditional_edges(
+    "call_model",
+    should_continue,
+    {
+        "call_tools": "call_tools",
+        END: END
+    }
+)
+
+graph.add_edge(
+    "call_tools",
+    "call_model"
+)
+
+app = graph.compile()
+
+# ==================================================
+# RUN
+# ==================================================
+
+result = app.invoke(
+    {
+        "messages": [
+            HumanMessage(
+                content="""
+მითხარი რამე წიგნზე '1984'
+და ფილმზე 'Inception'
+"""
+            )
+        ]
+    }
+)
+
+# ==================================================
+# PRINT ALL MESSAGES
+# ==================================================
+
+print("\n===== ALL MESSAGES =====\n")
+
+for message in result["messages"]:
+
+    print(type(message).__name__)
+
+    print(message)
+
+    print()
