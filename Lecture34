@@ -1,0 +1,152 @@
+-- ============================================
+-- HOMEWORK: LIBRARY DATABASE
+-- ============================================
+
+
+-- 1. CREATE TABLE
+
+CREATE TABLE books (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(150),
+    author VARCHAR(100),
+    genre VARCHAR(50),
+    publish_year INTEGER,
+    pages INTEGER,
+    price NUMERIC(8,2)
+);
+
+
+-- 2. INSERT AT LEAST 15 BOOKS
+
+INSERT INTO books (title, author, genre, publish_year, pages, price)
+VALUES
+('Harry Potter', 'J.K. Rowling', 'Fantasy', 1997, 320, 35.50),
+('The Hobbit', 'J.R.R. Tolkien', 'Fantasy', 1937, 310, 28.90),
+('The Alchemist', 'Paulo Coelho', 'Fiction', 1988, 208, 22.50),
+('Atomic Habits', 'James Clear', 'Self-help', 2018, 320, 32.00),
+('The Silent Patient', 'Alex Michaelides', 'Thriller', 2019, 336, 29.50),
+('Project Hail Mary', 'Andy Weir', 'Science Fiction', 2021, 496, 42.00),
+('The Midnight Library', 'Matt Haig', 'Fantasy', 2020, 304, 31.50),
+('Dune', 'Frank Herbert', 'Science Fiction', 1965, 412, 38.00),
+('The Psychology of Money', 'Morgan Housel', 'Finance', 2020, 256, 27.00),
+('Klara and the Sun', 'Kazuo Ishiguro', 'Science Fiction', 2021, 303, 33.50),
+('The Maid', 'Nita Prose', 'Mystery', 2022, 304, 26.00),
+('Tomorrow and Tomorrow and Tomorrow', 'Gabrielle Zevin', 'Fiction', 2022, 401, 36.00),
+('Fourth Wing', 'Rebecca Yarros', 'Fantasy', 2023, 528, 45.00),
+('Yellowface', 'R.F. Kuang', 'Fiction', 2023, 336, 30.00),
+('The Women', 'Kristin Hannah', 'Historical Fiction', 2024, 480, 41.50);
+
+
+-- 3. SELECT QUERIES
+
+-- 3.1 All books
+SELECT * FROM books;
+
+-- 3.2 Book title and author
+SELECT title, author
+FROM books;
+
+-- 3.3 Books with price greater than 30
+SELECT *
+FROM books
+WHERE price > 30;
+
+-- 3.4 Books published in 2020 or later
+SELECT *
+FROM books
+WHERE publish_year >= 2020;
+
+-- 3.5 Fantasy books
+SELECT *
+FROM books
+WHERE genre = 'Fantasy';
+
+-- 3.6 Books with more than 300 pages
+SELECT *
+FROM books
+WHERE pages > 300;
+
+-- 3.7 Books ordered by price ascending
+SELECT *
+FROM books
+ORDER BY price ASC;
+
+-- 3.8 Books ordered by publication year descending
+SELECT *
+FROM books
+ORDER BY publish_year DESC;
+
+
+-- 4. UPDATE DATA
+
+-- 4.1 Change the price of one book
+UPDATE books
+SET price = 39.99
+WHERE title = 'Atomic Habits';
+
+-- Check the result
+SELECT *
+FROM books
+WHERE title = 'Atomic Habits';
+
+
+-- 4.2 Change the genre of one book
+UPDATE books
+SET genre = 'Philosophical Fiction'
+WHERE title = 'The Alchemist';
+
+-- Check the result
+SELECT *
+FROM books
+WHERE title = 'The Alchemist';
+
+
+-- 4.3 Change the number of pages of one book
+UPDATE books
+SET pages = 320
+WHERE title = 'The Hobbit';
+
+-- Check the result
+SELECT *
+FROM books
+WHERE title = 'The Hobbit';
+
+
+-- 5. DELETE DATA
+
+-- 5.1 Delete one specific book
+DELETE FROM books
+WHERE title = 'Yellowface';
+
+-- Check the result
+SELECT * FROM books;
+
+
+-- 5.2 Delete all books published before 2000
+DELETE FROM books
+WHERE publish_year < 2000;
+
+-- Check the result
+SELECT * FROM books;
+
+
+-- 6. INSERT 5 MORE BOOKS
+
+INSERT INTO books (title, author, genre, publish_year, pages, price)
+VALUES
+('Lessons in Chemistry', 'Bonnie Garmus', 'Fiction', 2022, 400, 34.50),
+('The Housemaid', 'Freida McFadden', 'Thriller', 2022, 336, 29.99),
+('Iron Flame', 'Rebecca Yarros', 'Fantasy', 2023, 640, 47.50),
+('James', 'Percival Everett', 'Historical Fiction', 2024, 303, 38.90),
+('Intermezzo', 'Sally Rooney', 'Fiction', 2024, 448, 36.50);
+
+
+-- 7. FINAL CHECK
+
+SELECT * FROM books;
+
+
+-- 8. DROP TABLE
+-- Run this query ONLY after completing all previous tasks.
+
+DROP TABLE books;
